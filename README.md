@@ -16,7 +16,7 @@ Kaggle dataset: `nitishabharathi/email-spam-dataset`, fetched via `kagglehub` at
 - **Spam Assassin**; Data set, collated by Justin Mason between 2002-2003 as a **testing** [resource](https://spamassassin.apache.org/old/publiccorpus/readme.html) for spam filter developers.
 - **LingSpam**;  data set collated by researchers at NCSR Demokritos in 2000 from a linguistics mailing list as a benchmark for anti-spam filtering.
 
-Each source has a `Body` column (raw text, always starting with a `Subject:` header line) and a `Label` column (`spam/1` or `ham/0`).
+Each source has a `Body` column (raw text, generally starting with a `Subject:` header line) and a `Label` column (`spam/1` or `ham/0`).
 
 ## Methodology
 
@@ -36,7 +36,7 @@ This project followed the CRISP-DM framework.
 
 - The Enron data set was split into train and test sets (80/20 distribution) stratified on the `Label` column for a consistent distribution.
 - The Spam Assassin and LingSpam data sets were purely used as validation sets.  They were never used to fit or train a model, only to evaluate model performance on unseen email sources.
-- The vectorizer (TF-IDF) was only fit on the Enron training set.  The Spam Assassin and Lingspam sets were only transformed with this vectorizer (avoiding leaking their vocabulary into the model).
+- The vectorizer (TF-IDF) was only fit on the Enron training set.  The Spam Assassin and LingSpam sets were only transformed with this vectorizer (avoiding leaking their vocabulary into the model).
 
 This was an intentional setup to mirror the case of highly divergent email sources (across platform customers) and the need to effectively detect spam on novel streams of emails.
 
@@ -58,7 +58,7 @@ This indicates that these structural features are meaningful as indicators of sp
 | Dataset | Precision | Recall | F1 | ROC-AUC |
 |---|---|---|---|---|
 | Enron (test, in distribution) | 0.993 | 0.981 | 0.987 | 0.999 |
-| Spam Assassin (out of distribution) | 0.335 | 0.974 | 0.499 | 0.900 |
+| Spam Assassin (out of distribution) | 0.335 | 0.974 | 0.498 | 0.903 |
 | LingSpam (out of distribution) | 0.542 | 0.957 | 0.692 | 0.973 |
 
 Key observations:
@@ -66,5 +66,6 @@ Key observations:
 - **Excellent baseline in distribution**.  On the held out Enron test set, the model finds spam with very high precision and recall.
 - **Recall generalizes, precision does not**.  On the Spam Assassin and LingSpam sets recall stays high (model catches most real spam), but precision collapses (false positives).  This would render the model ineffective in a commercial context (as it would be blocking substantial amounts of legitimate customer traffic, leading to customer churn).
 - **Why this happens**.  The TF-IDF vocabulary was learned from Enron employees' writing style.  Legitimate email from the Spam Assassin and LingSpam data sets does not look like that corporate style, resulting in the model treating it as more spam-like.  The model appears to have learned "not corporate is more like spam", not what spam looks like in the general sense.
+- **Verified this isn't a data-quality artifact**.  Spam Assassin's raw text was not prefixed with `Subject:`, which an earlier version of the cleaning step didn't account for (silently dropping the first line of every message).  After fixing that bug, the metrics didn't substantially change (precision `0.335` either way), confirming the precision collapse is a genuine generalization gap.
 - **Positive ROC-AUC**.  ROC-AUC stays reasonably high even when precision collapses; suggesting that the model's underlying ranking is fairly sound, but needs threshold tuning (and possibly a more diverse training set).
 - **Why this matters**.  An email service provider with many customers would observe the same failure mode in practice - a filter trained on a subset of customer's "normal" writing styles may misclassify (and block) too much of a customer's legitimate traffic.
