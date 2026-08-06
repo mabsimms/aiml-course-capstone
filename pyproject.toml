@@ -16,7 +16,9 @@ dependencies = [
     "scikit-learn>=1.9.0",
     "seaborn>=0.13.2",
     "setuptools>=83.0.0",
-    "tensorflow==2.18.1",
+    #"tensorflow==2.22.0",
+    "tensorflow==2.22.0.dev0+selfbuilt ; sys_platform == 'linux'",
+    "tensorflow>=2.18.1,<2.22 ; sys_platform == 'darwin'",
     "tensorflow-metal>=1.2.0 ; sys_platform == 'darwin'",
 ]
 
@@ -27,6 +29,12 @@ build-backend = "uv_build"
 # Avoid pulling newest packages (supply chain attacks); static value will need to be periodically refreshed
 [tool.uv]
 exclude-newer = "2026-07-30T00:00:00Z"
+find-links = ["/home/masimms/wheels"]
+environments = ["sys_platform == 'linux'", "sys_platform == 'darwin'"]
+prerelease-package = {
+    tensorflow = "allow"
+}
+
 
 [dependency-groups]
 dev = [

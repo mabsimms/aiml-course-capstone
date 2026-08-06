@@ -31,7 +31,8 @@ def train_classical_model(
             label_col: str = "Label",
             param_grid : dict | None = None,
             n_jobs : int = -1,
-            cv : int = 5
+            cv : int = 5,
+            verbose : int = 0
 ) -> GridSearchCV:
         if param_grid is None:            
             param_grid = { 
@@ -63,7 +64,8 @@ def train_classical_model(
             scoring = "f1",
             # N-fold cross-validation within the training data (default to 5)
             cv=cv,
-            n_jobs=n_jobs
+            n_jobs=n_jobs,
+            verbose=verbose
         )        
         grid.fit(df_train, df_train[label_col])
         return grid
