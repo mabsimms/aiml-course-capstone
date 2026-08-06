@@ -15,7 +15,7 @@ def build_dnn_model(
     dense_units : int = 32,
     dropout_rate : float = 0.3,
     learning_rate : float = 1e-3,
-    use_cudnn : bool = True    
+    use_cudnn : bool = False    
 ) -> keras.Model:
     # Vectorize text (per https://keras.io/api/layers/preprocessing_layers/text/text_vectorization/)
     vectorize_layer = keras.layers.TextVectorization(
