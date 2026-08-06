@@ -70,7 +70,7 @@ def build_dnn_model(
 
     return model
 
-def train_dnn(df_train, feature_cols):
+def train_dnn(df_train, feature_cols, verbose=1):
     # Create a class weight to handle class imbalance in the targets (https://keras.io/examples/structured_data/imbalanced_classification/)
     # Penalize misclassification in the minority (spam) class, using the same weighting function as the 
     # classic model
@@ -100,7 +100,8 @@ def train_dnn(df_train, feature_cols):
                 patience=3,
                 restore_best_weights=True
             )
-        ]
+        ],
+        verbose=verbose
     )
 
     return model
