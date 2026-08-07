@@ -16,6 +16,7 @@ from capstone.dnn import train_dnn, dnn_predict_proba, tune_dnn
 from capstone.utils import log_duration, get_machine_info, build_metrics_summary
 from capstone.evaluate import evaluate_model
 from capstone.gpu import configure_gpu
+from capstone.manifest import build_manifest
 
 class LogLevel(str, Enum):
     info = "info"
@@ -107,6 +108,11 @@ def classic_train(
     metrics_path = output.with_suffix(".metrics.json")
     metrics_path.write_text(json.dumps(summary, indent=2))
     logger.info(f"Saved metrics summary to {metrics_path}")
+
+    manifest = build_manifest("classic", output, feature_cols)
+    manifest_path = output.with_suffix(".manifest.json")
+    manifest_path.write_text(json.dumps(manifest, indent=2))
+    logger.info(f"Saved model manifest to {manifest_path}")
 
 @dnn_app.command("train")
 def dnn_train(
