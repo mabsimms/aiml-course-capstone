@@ -7,7 +7,9 @@ from sklearn.model_selection import GridSearchCV
 
 import pandas as pd
 import numpy as np
+import joblib
 from typing import Callable
+from pathlib import Path
 
 def classical_predict_proba(pipeline: Pipeline) -> Callable[[pd.DataFrame], np.ndarray]:
     def predict(df: pd.DataFrame) -> np.ndarray:
@@ -69,3 +71,31 @@ def train_classical_model(
         )        
         grid.fit(df_train, df_train[label_col])
         return grid
+    
+def train_classical_model_cached(cache_path : Path, 
+        df_train: pd.DataFrame,
+        feature_cols: list[str],
+        label_col: str = "Label",
+        param_grid : dict | None = None,
+        n_jobs : int = -1,
+        cv : int = 5,
+        verbose : int = 0
+) -> GridSearchCV:
+    cache_path = Path(cache_path)
+    if cache_path.exists():
+        print(f"Loading cached model from {cache_path}")
+        return joblib.load(cache_path)
+
+    grid = train_classical_model(
+        df_train = df_train, 
+        feature_cols = feature_cols, 
+        label_col = label_col, 
+        param_grid = param_grid, 
+        n_jobs = n_jobs, 
+        cv = cv, 
+        verbose = verbose
+    )
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(grid, cache_path)
+    print(f"Saved trained model to {cache_path}")
+    return grid

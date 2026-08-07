@@ -2,8 +2,12 @@ import pandas as pd
 import numpy as np
 import tensorflow as tf
 import keras
+from pathlib import Path
 
 from sklearn.utils.class_weight import compute_class_weight
+
+import logging
+logger = logging.getLogger("capstone")
 
 def build_dnn_model(
     train_text: pd.Series,
@@ -15,14 +19,24 @@ def build_dnn_model(
     dense_units : int = 32,
     dropout_rate : float = 0.3,
     learning_rate : float = 1e-3,
-    use_cudnn : bool = False    
+    use_cudnn : str | bool = "auto"
 ) -> keras.Model:
+    logger.info(
+        "Building DNN model: max_tokens=%s, output_sequence_length=%s, embedding_dim=%s, "
+        "lstm_units=%s, dense_units=%s, dropout_rate=%s, learning_rate=%s, use_cudnn=%s",
+        max_tokens, output_sequence_length, embedding_dim, lstm_units, dense_units, dropout_rate,
+        learning_rate, use_cudnn
+    )
+    
     # Vectorize text (per https://keras.io/api/layers/preprocessing_layers/text/text_vectorization/)
     vectorize_layer = keras.layers.TextVectorization(
         max_tokens=max_tokens,
         # Set output_sequence_length to avoid padding issues with cuDNN on unbounded input
         output_sequence_length=output_sequence_length
     )
+    logger.info("TextVectorization output_sequence_length=%s",
+        vectorize_layer.get_config().get("output_sequence_length"))
+    
     vectorize_layer.adapt(train_text)
 
     # Normalize features (per https://keras.io/api/layers/preprocessing_layers/numerical/normalization/)
@@ -37,8 +51,22 @@ def build_dnn_model(
     # and memory layer (https://keras.io/api/layers/recurrent_layers/lstm/)
     text_branch = vectorize_layer(text_input)
     text_branch = keras.layers.Embedding(max_tokens, embedding_dim, mask_zero=True)(text_branch)
-    text_branch = keras.layers.LSTM(lstm_units, use_cudnn=use_cudnn)(text_branch)
+    ltsm_layer = keras.layers.LSTM(lstm_units, use_cudnn=use_cudnn)
+    text_branch = ltsm_layer(text_branch)
 
+    # adding logging on use of cuDNN per https://keras.io/api/layers/recurrent_layers/lstm/
+    logger.info("LSTM cuDNN-eligibility params: dropout=%s, recurrent_dropout=%s, "
+                "activation=%s, recurrent_activation=%s, unroll=%s, use_bias=%s, use_cudnn=%s",
+                ltsm_layer.dropout,
+                ltsm_layer.recurrent_dropout,
+                ltsm_layer.activation.__name__,
+                ltsm_layer.recurrent_activation.__name__,
+                ltsm_layer.unroll,
+                ltsm_layer.use_bias,
+                use_cudnn
+    )
+    logger.info("LSTM.supports_masking = %s", ltsm_layer.supports_masking)
+    
     # Numeric branch
     numeric_branch = normalizer(numeric_input)
     numeric_branch = keras.layers.Dense(16, activation="relu")(numeric_branch)
@@ -70,7 +98,21 @@ def build_dnn_model(
 
     return model
 
-def train_dnn(df_train, feature_cols, verbose=1):
+def train_dnn(
+        df_train : pd.DataFrame, 
+        feature_cols : list[str],
+        hyperparams : dict | None = None,
+        epochs : int = 15,
+        verbose : int = 1
+) -> tuple[keras.Model, keras.callbacks.History, dict]:
+    if hyperparams is None:
+        hyperparams = {}
+
+    if verbose > 0:
+        callback_verbose = 1
+    else:
+        callback_verbose = 0
+
     # Create a class weight to handle class imbalance in the targets (https://keras.io/examples/structured_data/imbalanced_classification/)
     # Penalize misclassification in the minority (spam) class, using the same weighting function as the 
     # classic model
@@ -84,25 +126,53 @@ def train_dnn(df_train, feature_cols, verbose=1):
     train_text = df_train["text"].to_numpy(dtype=object)
     train_features = df_train[feature_cols].to_numpy(dtype=np.float64)
 
-    model = build_dnn_model(train_text, train_features)
-    model.fit(
+    model = build_dnn_model(train_text, train_features, **hyperparams)
+
+    early_stopping = keras.callbacks.EarlyStopping(
+                    monitor="val_loss",
+                    patience=3,
+                    restore_best_weights=True,
+                    verbose = callback_verbose
+                )
+
+    history = model.fit(
         {
             "text": train_text,
             "engineered_features": train_features
         },
         df_train["Label"],
         validation_split=0.1,
-        epochs=15,
+        epochs=epochs,
         class_weight=class_weight_dict,
-        callbacks=[
-            keras.callbacks.EarlyStopping(
-                monitor="val_loss",
-                patience=3,
-                restore_best_weights=True
-            )
-        ],
+        callbacks=[early_stopping],
         verbose=verbose
     )
 
+    return model, history, {
+        'stopped_epoch': early_stopping.stopped_epoch,
+        'stopped_best_weights' : early_stopping.best_weights
+    }
+
+def train_dnn_cached(df_train : pd.DataFrame, feature_cols : list[str], cache_path : Path):
+    cache_path = Path(cache_path)
+    if cache_path.exists():
+        print(f"Loading cached model from {cache_path}")
+        return keras.models.load_model(cache_path)
+
+    model = train_dnn(df_train, feature_cols)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    model.save(cache_path)
+    print(f"Saved trained model tos {cache_path}")
+
     return model
 
+def dnn_predict_proba(model, feature_cols, verbose : int = 1):
+    def predict(df):
+        text = df["text"].to_numpy(dtype=object)
+        features = df[feature_cols].to_numpy(dtype=np.float64)
+        predictions = model.predict({
+            "text": text,
+            "engineered_features": features
+        }, verbose=verbose)
+        return predictions.ravel()
+    return predict

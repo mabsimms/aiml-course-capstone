@@ -1,0 +1,1 @@
+{"clf__C": 10, "features__tfidf__max_features": 20000, "features__tfidf__ngram_range": [1, 2]}
