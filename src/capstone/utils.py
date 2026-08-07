@@ -55,3 +55,14 @@ def get_machine_info() -> dict:
         "gpus": gpu_names,
         "gpu_memory_info": gpu_memory_info
     }    
+
+def build_metrics_summary(metrics: dict, threshold: float = 0.5) -> dict:
+    return { 
+        "precision": metrics["precision"],
+        "recall": metrics["recall"],
+        "f1": metrics["f1"],
+        "roc_auc": metrics["roc_auc"],
+        "threshold": threshold,
+        "confusion_matrix": metrics["confusion_matrix"].tolist(),
+        "classification_report": metrics["classification_report"],
+    }
