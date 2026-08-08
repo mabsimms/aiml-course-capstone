@@ -21,6 +21,13 @@ def prep_data(
         subject = parts["header"].str[len("Subject:"):].str.strip().where(is_subject_prefixed, "")
         body = parts["body"].where(is_subject_prefixed, df[body_col])
 
+        # Normalize non-standard Unicode line/control separators (e.g. NEL, \x85) to a plain
+        # space so they act as word separators rather than surviving as standalone vocabulary
+        # tokens - Keras's TextVectorization only recognizes ASCII whitespace as a separator
+        control_separators = r"[\x0b\x0c\x1c-\x1e\x85\u2028\u2029]"
+        subject = subject.str.replace(control_separators, " ", regex=True)
+        body = body.str.replace(control_separators, " ", regex=True)
+
         df_prepped = pd.DataFrame()    
         df_prepped[subject_col] = subject
         df_prepped[body_col] = body

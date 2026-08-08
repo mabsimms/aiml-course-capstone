@@ -91,8 +91,6 @@ def test_dnn_vocabulary_export(tmp_path):
 
     assert exported_vocabulary == live_vocabulary
     
-
-@pytest.mark.skip(reason="Need to fix vocabulary issue first")
 def test_dnn_save_load_roundtrip(tmp_path):
     raw_dir = Path(kagglehub.dataset_download("nitishabharathi/email-spam-dataset"))
     raw = { 
@@ -115,15 +113,12 @@ def test_dnn_save_load_roundtrip(tmp_path):
     save_path = tmp_path / "roundtrip.keras"
     model.save(save_path)
 
-    #reloaded = keras.models.load_model(save_path)
+    reloaded = keras.models.load_model(save_path)
     
-
-    reloaded = load_dnn_model(save_path, feature_cols, hyperparameters)
-
     predictions = reloaded.predict(
         {
             "text": df_train["text"].to_numpy(dtype=object), 
-            "engineered_features": df_train[["feature_a"]].to_numpy(dtype=np.float64)
+            "engineered_features": df_train[feature_cols].to_numpy(dtype=np.float64)
         },
         verbose=0
     )

@@ -6,11 +6,15 @@ import keras_tuner as kt
 from pathlib import Path
 import tempfile
 import zipfile
-
+import tensorflow as tf
+#import tensorflow_text as tf_text
 from sklearn.utils.class_weight import compute_class_weight
 
 import logging
 logger = logging.getLogger("capstone")
+
+def _lowercase_only(input_text):
+    return tf.strings.lower(input_text)
 
 def build_dnn_model(
     train_text: pd.Series,
@@ -33,10 +37,17 @@ def build_dnn_model(
     )
     
     # Vectorize text (per https://keras.io/api/layers/preprocessing_layers/text/text_vectorization/)
+    # Need to use the TF Text Unicode script tokenizer, as the default keras split function doesn't
+    # properly account for unicode separation characters (which breaks model export/import)s
+    #tokenizer = tf_text.UnicodeScriptTokenizer()
+
     vectorize_layer = keras.layers.TextVectorization(
         max_tokens=max_tokens,
         # Set output_sequence_length to avoid padding issues with cuDNN on unbounded input
-        output_sequence_length=output_sequence_length
+        output_sequence_length=output_sequence_length,
+        #standardize=_lowercase_only,
+        #split=tokenizer.tokenize,
+        name="text_vectorization"
     )
     logger.info("TextVectorization output_sequence_length=%s",
         vectorize_layer.get_config().get("output_sequence_length"))
@@ -47,7 +58,7 @@ def build_dnn_model(
         print(len(vocabulary), list(vocabulary).count(""))
         indices = [i for i, term in enumerate(vocabulary) if term == ""]
         print(indices)
-        
+
         vectorize_layer.set_vocabulary(vocabulary)
     else:
         vectorize_layer.adapt(train_text)
