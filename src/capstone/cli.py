@@ -12,7 +12,8 @@ from enum import Enum
 
 from capstone.dataset import prepare_experiment
 from capstone.classic import build_classical_pipeline, classical_predict_proba
-from capstone.dnn import train_dnn, dnn_predict_proba, tune_dnn
+from capstone.dnn import train_dnn, dnn_predict_proba
+from capstone.dnn_tuner import tune_dnn
 from capstone.utils import log_duration, get_machine_info, build_metrics_summary
 from capstone.evaluate import evaluate_model
 from capstone.gpu import configure_gpu
@@ -159,6 +160,16 @@ def dnn_train(
     metrics_path = output.with_suffix(".metrics.json")
     metrics_path.write_text(json.dumps(summary, indent=2))
     logger.info(f"Saved metrics summary to {metrics_path}")
+
+    manifest = build_manifest("dnn", output, feature_cols, hyperparameters=hyperparams)
+    manifest_path = output.with_suffix(".manifest.json")
+    manifest_path.write_text(json.dumps(manifest, indent=2))
+    logger.info(f"Saved model manifest to {manifest_path}")
+
+    vocabulary = model.get_layer("text_vectorization").get_vocabulary()
+    vocabulary_path = output.with_suffix(".vocabulary.json")
+    vocabulary_path.write_text(json.dumps(vocabulary))
+    logger.info(f"Saved model vocabulary to {vocabulary_path}")
 
 @dnn_app.command("tune")
 def dnn_tune(

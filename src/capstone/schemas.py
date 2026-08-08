@@ -6,7 +6,7 @@ class Message(BaseModel):
     subject : str = ""
     body: str
 
-class ScoringRequest(BaseModel):
+class ScoreRequest(BaseModel):
     messages: list[Message]
 
 class ScoreResult(BaseModel):

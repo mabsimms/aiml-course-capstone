@@ -10,7 +10,7 @@ from pathlib import Path
 from dataclasses import dataclass
 
 from capstone.classic import classical_predict_proba
-from capstone.dnn import dnn_predict_proba
+from capstone.dnn import dnn_predict_proba, load_dnn_model
 from capstone.manifest import SCHEMA_VERSION
 
 @dataclass
@@ -38,7 +38,8 @@ def load_predictor(manifest_path : Path) -> Predictor:
         pipeline = joblib.load(artifact_path)
         predict = classical_predict_proba(pipeline)
     elif model_type == "dnn":
-        model = keras.models.load_model(artifact_path)
+        #model = keras.models.load_model(artifact_path)
+        model = load_dnn_model(artifact_path, feature_cols, manifest["hyperparameters"])
         predict = dnn_predict_proba(model, feature_cols, verbose=0)
     else:
         raise ValueError(f"Unknown model type {model_type} in {manifest_path}")

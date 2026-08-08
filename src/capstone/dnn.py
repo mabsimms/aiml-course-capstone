@@ -4,10 +4,10 @@ import tensorflow as tf
 import keras
 import keras_tuner as kt
 from pathlib import Path
+import tempfile
+import zipfile
 
 from sklearn.utils.class_weight import compute_class_weight
-
-from capstone.dnn_tuner import SpamHyperModel
 
 import logging
 logger = logging.getLogger("capstone")
@@ -22,7 +22,8 @@ def build_dnn_model(
     dense_units : int = 32,
     dropout_rate : float = 0.3,
     learning_rate : float = 1e-3,
-    use_cudnn : str | bool = "auto"
+    use_cudnn : str | bool = "auto",
+    vocabulary : list[str] | None = None
 ) -> keras.Model:
     logger.info(
         "Building DNN model: max_tokens=%s, output_sequence_length=%s, embedding_dim=%s, "
@@ -39,8 +40,17 @@ def build_dnn_model(
     )
     logger.info("TextVectorization output_sequence_length=%s",
         vectorize_layer.get_config().get("output_sequence_length"))
-    
-    vectorize_layer.adapt(train_text)
+
+    if vocabulary is not None:
+        # Reconstructing a previously trained model from a saved vocabulary (working around a Keras 
+        # bug where a saved vectorization set fails to restore via load_model())
+        print(len(vocabulary), list(vocabulary).count(""))
+        indices = [i for i, term in enumerate(vocabulary) if term == ""]
+        print(indices)
+        
+        vectorize_layer.set_vocabulary(vocabulary)
+    else:
+        vectorize_layer.adapt(train_text)
 
     # Normalize features (per https://keras.io/api/layers/preprocessing_layers/numerical/normalization/)
     normalizer = keras.layers.Normalization()
@@ -180,69 +190,21 @@ def dnn_predict_proba(model, feature_cols, verbose : int = 1):
         return predictions.ravel()
     return predict
 
-def tune_dnn(
-    df_train: pd.DataFrame,
-    feature_cols: list[str],
-    search_space: dict,
-    fixed_hyperparameters: dict,
-    max_trials: int = 15,
-    epochs: int = 15,
-    tuner_dir : Path = Path("artifacts/tuner"),
-    project_name : str = "dnn_search",
-    overwrite : bool = False,
-    verbose : int = 1,
-) -> dict:
-    if verbose > 0:
-        callback_verbose = 1
-    else:
-        callback_verbose = 0
-        
-    class_weights = compute_class_weight(
-            class_weight="balanced",
-            classes=np.unique(df_train["Label"]),
-            y=df_train["Label"]
-    )      
-    class_weight_dict = dict(zip(np.unique(df_train["Label"]), class_weights))
-    train_text = df_train["text"].to_numpy(dtype=object)
-    train_features = df_train[feature_cols].to_numpy(dtype=np.float64)
+def load_dnn_model(artifact_path: Path, feature_cols: list[str], hyperparameters: dict) -> keras.Model:
+    # Keras round-tripping is fragile; this is the workaround
+    with zipfile.ZipFile(artifact_path) as archive:
+        vocabulary = archive.read("assets/layers/text_vectorization/vocabulary.txt").decode("utf-8").splitlines()
 
-    logger.info("Starting keras tuner search; max_trials=%s, epochs=%s, search_space=%s", 
-                max_trials, epochs, list(search_space.keys()))
+        with tempfile.NamedTemporaryFile(suffix=".weights.h5") as weights_file:
+            weights_file.write(archive.read("model.weights.h5"))
+            weights_file.flush()
 
-    hypermodel = SpamHyperModel(train_text, train_features, search_space, fixed_hyperparameters)
-    tuner = kt.RandomSearch(
-        hypermodel,
-        objective="val_loss",
-        max_trials=max_trials,
-        directory=str(tuner_dir),
-        project_name=project_name,
-        overwrite=overwrite
-    )
+            dummy_text = pd.Series([""])
+            dummy_features = np.zeros((1, len(feature_cols)), dtype=np.float64)
 
-    early_stopping = keras.callbacks.EarlyStopping(
-                    monitor="val_loss",
-                    patience=3,
-                    restore_best_weights=True,
-                    verbose = callback_verbose
-    )
+            model = build_dnn_model(
+                dummy_text, dummy_features, vocabulary=vocabulary, **hyperparameters
+            )
+            model.load_weights(weights_file.name)
 
-    tuner.search(
-         {
-            "text": train_text,
-            "engineered_features": train_features
-        },
-        df_train["Label"],
-        validation_split=0.1,
-        epochs=epochs,
-        class_weight=class_weight_dict,
-        callbacks=[early_stopping],
-        verbose=verbose
-    )
-
-    best_hp = tuner.get_best_hyperparameters(num_trials=1)[0]
-    best_trial = tuner.oracle.get_best_trials(num_trials=1)[0]
-    return { 
-        "hyperparameters": { **best_hp.values, **fixed_hyperparameters },
-        "best_val_loss": best_trial.score,
-        "trials_completed": len(tuner.oracle.trials)
-    }
+    return model

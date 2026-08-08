@@ -42,7 +42,7 @@ def score(payload: ScoreRequest, request: Request) -> ScoreResponse:
         results=[ScoreResult(spam_probability=float(p)) for p in probabilities]
     )
 
-@app.post("/health")
+@app.get("/health")
 def health(request : Request) -> dict:
     predictor: Predictor = request.app.state.predictor
     return {
