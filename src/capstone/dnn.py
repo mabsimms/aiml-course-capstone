@@ -2,12 +2,13 @@ import pandas as pd
 import numpy as np
 import tensorflow as tf
 import keras
-import keras_tuner as kt
+
+#from keras.tuner import HyperModel, RandomSearch
+
 from pathlib import Path
 import tempfile
 import zipfile
 import tensorflow as tf
-#import tensorflow_text as tf_text
 from sklearn.utils.class_weight import compute_class_weight
 
 import logging

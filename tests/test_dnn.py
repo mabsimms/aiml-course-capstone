@@ -7,7 +7,7 @@ import kagglehub
 import zipfile
 
 from capstone.dataset import prepare_experiment
-from capstone.dnn import build_dnn_model, train_dnn, load_dnn_model
+from capstone.dnn import build_dnn_model, load_dnn_model, train_dnn
 from capstone.predictor import load_predictor
 
 def test_build_dnn_model():
