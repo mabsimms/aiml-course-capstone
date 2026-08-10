@@ -13,7 +13,6 @@ from enum import Enum
 from capstone.dataset import prepare_experiment
 from capstone.classic import build_classical_pipeline, classical_predict_proba
 from capstone.dnn import train_dnn, dnn_predict_proba
-from capstone.dnn_tuner import tune_dnn
 from capstone.utils import log_duration, get_machine_info, build_metrics_summary
 from capstone.evaluate import evaluate_model
 from capstone.gpu import configure_gpu
@@ -184,45 +183,47 @@ def dnn_tune(
     project_name : str = typer.Option("dnn_search"),
     overwrite : bool = typer.Option(False, "--overwrite", help="Start a fresh search, disciarding any existing trials in --tuner-dir")
 ):
-    with log_duration("dnn tune") as timing:
-        df_train, df_test, feature_cols = resolve_training_data(file, directory)
-        search_space = json.loads(config.read_text())
-        verbose = _KERAS_VERBOSE_MAP[ctx.obj]
+	pass
 
-        result = tune_dnn(df_train, feature_cols, 
-                          search_space=search_space,
-                          fixed_hyperparameters={"use_cudnn": True},
-                          max_trials=max_trials,
-                          epochs=epochs,
-                          tuner_dir=tuner_dir,
-                          project_name=project_name,
-                          overwrite=overwrite,
-                          verbose=verbose,
-        )
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(json.dumps(result["hyperparameters"], indent=2))
-        logger.info("Saved best hyperparameters to {output}")
-
-        summary = { 
-            "operation": "dnn train",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "duration_seconds": timing["seconds"],
-            "machine": get_machine_info(),
-            "input_data": { 
-                "train_rows": len(df_train),
-                "test_rows": len(df_test),
-                "num_features": len(feature_cols)
-            },
-            "search_space": search_space,
-            "max_trials": max_trials,
-            "epochs_per_trial": epochs,
-            "trials_completed": result["trials_completed"],
-            "best_val_loss": result["best_val_loss"],
-            "best_hyperparameters": result["hyperparameters"]
-        }
-        summary_path = output.with_suffix(".summary.json")
-        summary_path.write_text(json.dumps(summary, indent=2))
-        logger.info(f"Saved metrics summary to {summary_path}")
+    #with log_duration("dnn tune") as timing:
+    #    df_train, df_test, feature_cols = resolve_training_data(file, directory)
+    #    search_space = json.loads(config.read_text())
+    #    verbose = _KERAS_VERBOSE_MAP[ctx.obj]
+#
+#        result = tune_dnn(df_train, feature_cols, 
+#                          search_space=search_space,
+#                          fixed_hyperparameters={"use_cudnn": True},
+#                          max_trials=max_trials,
+#                          epochs=epochs,
+#                          tuner_dir=tuner_dir,
+#                          project_name=project_name,
+#                          overwrite=overwrite,
+#                          verbose=verbose,
+#        )
+#        output.parent.mkdir(parents=True, exist_ok=True)
+#        output.write_text(json.dumps(result["hyperparameters"], indent=2))
+#        logger.info("Saved best hyperparameters to {output}")
+#
+#        summary = { 
+#            "operation": "dnn train",
+#            "timestamp": datetime.now(timezone.utc).isoformat(),
+#            "duration_seconds": timing["seconds"],
+#            "machine": get_machine_info(),
+#            "input_data": { 
+#                "train_rows": len(df_train),
+#                "test_rows": len(df_test),
+#                "num_features": len(feature_cols)
+#            },
+#            "search_space": search_space,
+#            "max_trials": max_trials,
+#            "epochs_per_trial": epochs,
+#            "trials_completed": result["trials_completed"],
+#            "best_val_loss": result["best_val_loss"],
+#            "best_hyperparameters": result["hyperparameters"]
+#        }
+#        summary_path = output.with_suffix(".summary.json")
+#        summary_path.write_text(json.dumps(summary, indent=2))
+#        logger.info(f"Saved metrics summary to {summary_path}")
 
 
 @app.callback()

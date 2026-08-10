@@ -2,6 +2,7 @@
 
 import pandas as pd
 
+from pathlib import Path
 from tokenizers import Tokenizer, decoders
 from tokenizers.models import BPE
 from tokenizers.pre_tokenizers import ByteLevel
@@ -38,3 +39,10 @@ def train_tokenizer(
 
     tokenizer.enable_truncation(max_length=output_sequence_length)
     return tokenizer
+
+def load_tokenizer(path : str = "tokenizer.json") -> Tokenizer:
+    return Tokenizer.from_file(path)
+
+def save_tokenizer(tokenizer : Tokenizer, path : Path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tokenizer.save(str(path))

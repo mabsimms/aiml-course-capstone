@@ -1,0 +1,14 @@
+category,text
+basic,The quick brown fox jumps over the lazy dog.
+technical,TensorFlow and PyTorch are deep learning frameworks.
+unicode,Unicode handles émojis 🎉 and CJK characters 你好世界 correctly.
+punctuation,Contractions like don't and won't should tokenize cleanly.
+numeric,Numbers 42 and floats 3.14159 are part of real text.
+whitespace,  Extra   whitespace   and tabs	here  
+empty,
+single_char,A
+accented,café résumé naïve
+urls,hello@example.com and https://example.com/path?q=1
+currency,It costs $49.99 — not €50,00!
+multilingual,日本語テスト Korean 테스트 Arabic اختبار
+code,def foo(x: int) -> str: return f'{x}'

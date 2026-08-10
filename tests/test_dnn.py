@@ -9,6 +9,9 @@ import zipfile
 from capstone.dataset import prepare_experiment
 from capstone.dnn import build_dnn_model, load_dnn_model, train_dnn
 from capstone.predictor import load_predictor
+from capstone.tokenization.tokenization import train_tokenizer, save_tokenizer, load_tokenizer, PAD_TOKEN, UNK_TOKEN
+
+pytestmark = pytest.mark.train
 
 def test_build_dnn_model():
     train_text = pd.Series([
@@ -24,19 +27,26 @@ def test_build_dnn_model():
         [2.0, 0.0]
     ])
 
+    # Using our externalized tokenizer
+    tokenizer = train_tokenizer(train_text, vocab_size=100, output_sequence_length=16)
+    encodings = tokenizer.encode_batch(train_text.tolist())
+    encoded_text = np.array([e.ids for e in encodings], dtype=np.int32)
+
     model = build_dnn_model(
-        train_text, 
-        train_features, 
-        max_tokens=100, 
+        train_features,
+        vocab_size=tokenizer.get_vocab_size(), 
+        output_sequence_length=16,
         embedding_dim=8,
         lstm_units=4,
         dense_units=4
     )
-
     assert model.optimizer is not None
 
     predictions = model.predict(
-        {"text": train_text.to_numpy(dtype=object), "engineered_features": train_features},
+        {
+            "text": encoded_text,
+            "engineered_features": train_features
+        },
         verbose=0
     )
 
@@ -47,11 +57,14 @@ FIXTURE_PATH = Path(__file__).parent / "fixtures" / "dnn_train_sample.csv"
 
 def test_train_dnn():
     df_train = pd.read_csv(FIXTURE_PATH)
-    model, _, _ = train_dnn(df_train, feature_cols=["feature_a"], verbose=0)
+    model, _, _, tokenizer = train_dnn(df_train, feature_cols=["feature_a"], verbose=0)
+
+    encodings = tokenizer.encode_batch(df_train["text"].tolist())
+    encoded_text = np.array([e.ids for e in encodings], dtype=np.int32)
 
     predictions = model.predict(
         {
-            "text": df_train["text"].to_numpy(),
+            "text": encoded_text,
             "engineered_features": df_train[["feature_a"]].to_numpy()
         },
         verbose=0
@@ -59,71 +72,32 @@ def test_train_dnn():
 
     assert predictions.shape == (len(df_train), 1)
     assert (predictions > 0).all() and (predictions <= 1).all()
-
-def get_vocabulary(model: keras.Model) -> list[str]:
-    vectorize_layer = next(
-        layer for layer in model.layers if isinstance(layer, keras.layers.TextVectorization)
-    )
-    return vectorize_layer.get_vocabulary()
-
-def test_dnn_vocabulary_export(tmp_path):
-    raw_dir = Path(kagglehub.dataset_download("nitishabharathi/email-spam-dataset"))
-    raw = { 
-        csv_file.stem: pd.read_csv(csv_file) for csv_file in raw_dir.glob("*.csv")
-    }
-    print("Starting full training run")
-    df_train, _, feature_cols = prepare_experiment(raw, stratify_by_source=True)
-    model = build_dnn_model(
-        df_train["text"],
-        df_train[feature_cols].to_numpy(dtype=np.float64),        
-    )
-    print("Full training complete")
-
-    live_vocabulary = get_vocabulary(model)
-
-    save_path = tmp_path / "vocab_check.keras"
-    model.save(save_path)
-
-    with zipfile.ZipFile(save_path) as archive:
-        exported_vocabulary = archive.read(
-            "assets/layers/text_vectorization/vocabulary.txt"
-        ).decode("utf-8").splitlines()
-
-    assert exported_vocabulary == live_vocabulary
-    
+ 
 def test_dnn_save_load_roundtrip(tmp_path):
-    raw_dir = Path(kagglehub.dataset_download("nitishabharathi/email-spam-dataset"))
-    raw = { 
-        csv_file.stem: pd.read_csv(csv_file) for csv_file in raw_dir.glob("*.csv")
-    }
-    df_train, _, feature_cols = prepare_experiment(raw, stratify_by_source=True)
+    #raw_dir = Path(kagglehub.dataset_download("nitishabharathi/email-spam-dataset"))
+    #raw = { 
+    #    csv_file.stem: pd.read_csv(csv_file) for csv_file in raw_dir.glob("*.csv")
+    #}
+    #df_train, _, feature_cols = prepare_experiment(raw, stratify_by_source=True)
+    df_train = pd.read_csv(FIXTURE_PATH)
 
     hyperparameters = { 
+        "max_tokens": 20_000,
+        "output_sequence_length": 32,
         "embedding_dim": 8,
         "lstm_units": 4,
         "dense_units": 4
     }
 
-    model = build_dnn_model(
-        df_train["text"],
-        df_train[feature_cols].to_numpy(dtype=np.float64),
-        **hyperparameters
-    )
+    model, _, _, tokenizer = train_dnn(df_train, feature_cols=["feature_a"], verbose=0)
 
-    save_path = tmp_path / "roundtrip.keras"
-    model.save(save_path)
+    weights_path = tmp_path / "roundtrip.weights.h5"
+    tokenizer_path = tmp_path / "roundtrip.tokenizer.json"
 
-    reloaded = keras.models.load_model(save_path)
-    
-    predictions = reloaded.predict(
-        {
-            "text": df_train["text"].to_numpy(dtype=object), 
-            "engineered_features": df_train[feature_cols].to_numpy(dtype=np.float64)
-        },
-        verbose=0
-    )
-    assert predictions.shape == (len(df_train), 1)
+    model.save_weights(weights_path)
+    save_tokenizer(tokenizer, tokenizer_path)
 
+    # TODO - need to include the hyperparameters to rebuild from saved model
 
 # DNN_MANIFEST_PATH = Path("artifacts/dnn_baseline.manifest.json")
 

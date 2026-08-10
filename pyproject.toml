@@ -39,6 +39,12 @@ find-links = ["./dependencies/wheels"]
 environments = ["sys_platform == 'linux'", "sys_platform == 'darwin'"]
 prerelease-package = { tensorflow = "allow" }
 
+# Configure pytest options
+[tool.pytest.ini_options]
+markers = [
+    "train: marks slow training tests",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",

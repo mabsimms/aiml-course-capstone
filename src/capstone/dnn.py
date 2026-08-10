@@ -3,7 +3,9 @@ import numpy as np
 import tensorflow as tf
 import keras
 
-#from keras.tuner import HyperModel, RandomSearch
+from tokenizers import Tokenizer
+
+from capstone.tokenization.tokenization import train_tokenizer, save_tokenizer, load_tokenizer, PAD_TOKEN, UNK_TOKEN
 
 from pathlib import Path
 import tempfile
@@ -17,10 +19,9 @@ logger = logging.getLogger("capstone")
 def _lowercase_only(input_text):
     return tf.strings.lower(input_text)
 
-def build_dnn_model(
-    train_text: pd.Series,
+def build_dnn_model(    
     train_features: np.ndarray,
-    max_tokens: int = 20_000,
+    vocab_size : int,    
     output_sequence_length : int = 3000,
     embedding_dim : int = 64,
     lstm_units : int = 64,
@@ -31,51 +32,23 @@ def build_dnn_model(
     vocabulary : list[str] | None = None
 ) -> keras.Model:
     logger.info(
-        "Building DNN model: max_tokens=%s, output_sequence_length=%s, embedding_dim=%s, "
+        "Building DNN model: vocab_size=%s, output_sequence_length=%s, embedding_dim=%s, "
         "lstm_units=%s, dense_units=%s, dropout_rate=%s, learning_rate=%s, use_cudnn=%s",
-        max_tokens, output_sequence_length, embedding_dim, lstm_units, dense_units, dropout_rate,
+        vocab_size, output_sequence_length, embedding_dim, lstm_units, dense_units, dropout_rate,
         learning_rate, use_cudnn
     )
-    
-    # Vectorize text (per https://keras.io/api/layers/preprocessing_layers/text/text_vectorization/)
-    # Need to use the TF Text Unicode script tokenizer, as the default keras split function doesn't
-    # properly account for unicode separation characters (which breaks model export/import)s
-    #tokenizer = tf_text.UnicodeScriptTokenizer()
-
-    vectorize_layer = keras.layers.TextVectorization(
-        max_tokens=max_tokens,
-        # Set output_sequence_length to avoid padding issues with cuDNN on unbounded input
-        output_sequence_length=output_sequence_length,
-        #standardize=_lowercase_only,
-        #split=tokenizer.tokenize,
-        name="text_vectorization"
-    )
-    logger.info("TextVectorization output_sequence_length=%s",
-        vectorize_layer.get_config().get("output_sequence_length"))
-
-    if vocabulary is not None:
-        # Reconstructing a previously trained model from a saved vocabulary (working around a Keras 
-        # bug where a saved vectorization set fails to restore via load_model())
-        print(len(vocabulary), list(vocabulary).count(""))
-        indices = [i for i, term in enumerate(vocabulary) if term == ""]
-        print(indices)
-
-        vectorize_layer.set_vocabulary(vocabulary)
-    else:
-        vectorize_layer.adapt(train_text)
-
+     
     # Normalize features (per https://keras.io/api/layers/preprocessing_layers/numerical/normalization/)
     normalizer = keras.layers.Normalization()
     normalizer.adapt(train_features)
 
     # Set up input shapes (https://keras.io/api/layers/core_layers/input/)
-    text_input = keras.Input(shape=(1,), dtype=tf.string, name="text")
+    text_input = keras.Input(shape=(output_sequence_length,), dtype=tf.int32, name="text")
     numeric_input = keras.Input(shape=(train_features.shape[1],), name="engineered_features")
 
     # Text branch with embedding (https://keras.io/api/layers/core_layers/embedding/)
-    # and memory layer (https://keras.io/api/layers/recurrent_layers/lstm/)
-    text_branch = vectorize_layer(text_input)
-    text_branch = keras.layers.Embedding(max_tokens, embedding_dim, mask_zero=True)(text_branch)
+    # and memory layer (https://keras.io/api/layers/recurrent_layers/lstm/)    
+    text_branch = keras.layers.Embedding(vocab_size, embedding_dim, mask_zero=True)(text_input)
     ltsm_layer = keras.layers.LSTM(lstm_units, use_cudnn=use_cudnn)
     text_branch = ltsm_layer(text_branch)
 
@@ -123,13 +96,18 @@ def build_dnn_model(
 
     return model
 
+
+def _encode_text(tokenizer: Tokenizer, text: pd.Series) -> np.ndarray:
+    encodings = tokenizer.encode_batch(text.tolist())
+    return np.array([encoding.ids for encoding in encodings], dtype=np.int32)
+
 def train_dnn(
         df_train : pd.DataFrame, 
         feature_cols : list[str],
         hyperparams : dict | None = None,
         epochs : int = 15,
         verbose : int = 1
-) -> tuple[keras.Model, keras.callbacks.History, dict]:
+) -> tuple[keras.Model, keras.callbacks.History, dict, Tokenizer]:
     if hyperparams is None:
         hyperparams = {}
 
@@ -147,11 +125,21 @@ def train_dnn(
         y=df_train["Label"]
     )
     class_weight_dict = dict(zip(np.unique(df_train["Label"]), class_weights))
-
-    train_text = df_train["text"].to_numpy(dtype=object)
+    
     train_features = df_train[feature_cols].to_numpy(dtype=np.float64)
 
-    model = build_dnn_model(train_text, train_features, **hyperparams)
+    max_tokens = hyperparams.get("max_tokens", 20_000)
+    output_sequence_length = hyperparams.get("output_sequence_length", 3_000)
+
+    tokenizer = train_tokenizer(
+        df_train["text"],
+        vocab_size=max_tokens,
+        output_sequence_length=output_sequence_length
+    )
+    assert tokenizer.token_to_id(PAD_TOKEN) == 0, "Expected PAD token id 0"    
+    encoded_text = _encode_text(tokenizer, df_train["text"])
+
+    model = build_dnn_model(train_features, tokenizer.get_vocab_size(), **hyperparams)
 
     early_stopping = keras.callbacks.EarlyStopping(
                     monitor="val_loss",
@@ -162,7 +150,7 @@ def train_dnn(
 
     history = model.fit(
         {
-            "text": train_text,
+            "text": encoded_text,
             "engineered_features": train_features
         },
         df_train["Label"],
@@ -176,47 +164,30 @@ def train_dnn(
     return model, history, {
         'stopped_epoch': early_stopping.stopped_epoch,
         'stopped_best_weights' : early_stopping.best_weights
-    }
+    }, tokenizer
 
-def train_dnn_cached(df_train : pd.DataFrame, feature_cols : list[str], cache_path : Path):
-    cache_path = Path(cache_path)
-    if cache_path.exists():
-        print(f"Loading cached model from {cache_path}")
-        return keras.models.load_model(cache_path)
 
-    model = train_dnn(df_train, feature_cols)
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    model.save(cache_path)
-    print(f"Saved trained model tos {cache_path}")
-
-    return model
-
-def dnn_predict_proba(model, feature_cols, verbose : int = 1):
+def dnn_predict_proba(model, tokenizer, feature_cols, verbose : int = 1):
     def predict(df):
-        text = df["text"].to_numpy(dtype=object)
+        encoded_text = _encode_text(tokenizer, df["text"])        
         features = df[feature_cols].to_numpy(dtype=np.float64)
         predictions = model.predict({
-            "text": text,
+            "text": encoded_text,
             "engineered_features": features
         }, verbose=verbose)
         return predictions.ravel()
     return predict
 
-def load_dnn_model(artifact_path: Path, feature_cols: list[str], hyperparameters: dict) -> keras.Model:
-    # Keras round-tripping is fragile; this is the workaround
-    with zipfile.ZipFile(artifact_path) as archive:
-        vocabulary = archive.read("assets/layers/text_vectorization/vocabulary.txt").decode("utf-8").splitlines()
+def load_dnn_model(
+        weights_path: Path,
+        tokenizer_path: Path,
+        feature_cols: list[str], 
+        hyperparameters: dict
+) -> tuple[keras.Model, Tokenizer]:
+    tokenizer = load_tokenizer(str(tokenizer_path))
+    dummy_features = np.zeros((1, len(feature_cols)), dtype=np.float64)
 
-        with tempfile.NamedTemporaryFile(suffix=".weights.h5") as weights_file:
-            weights_file.write(archive.read("model.weights.h5"))
-            weights_file.flush()
-
-            dummy_text = pd.Series([""])
-            dummy_features = np.zeros((1, len(feature_cols)), dtype=np.float64)
-
-            model = build_dnn_model(
-                dummy_text, dummy_features, vocabulary=vocabulary, **hyperparameters
-            )
-            model.load_weights(weights_file.name)
-
-    return model
+    model = build_dnn_model(dummy_features, tokenizer.get_vocab_size(), **hyperparameters)
+    model.load_weights(weights_path)
+     
+    return model, tokenizer
