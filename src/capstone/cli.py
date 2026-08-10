@@ -120,7 +120,7 @@ def dnn_train(
     config: Path = typer.Option(..., exists=True, help="JSON hyperparameter configuration"),
     file: Optional[Path] = typer.Option(None, help="Single raw source CSV"),
     directory: Optional[Path] = typer.Option(None, help="Directory of raw per-source CSVs"),
-    output: Path = typer.Option(..., help="Target file for the trained model (.joblib)"),
+    output: Path = typer.Option(..., help="Target file template for the trained model artifacts"),
     epochs: int = typer.Option(15, help="Maximum training runs (epochs)")
 ):
     df_train, df_test, feature_cols = resolve_training_data(file, directory)
@@ -128,14 +128,24 @@ def dnn_train(
     
     verbose = _KERAS_VERBOSE_MAP[ctx.obj]
     with log_duration("DNN training") as timing:
-        model, history, stop = train_dnn(df_train, feature_cols, hyperparams=hyperparams, epochs=epochs, verbose=verbose)
+        model, history, stop, tokenizer = train_dnn(df_train, feature_cols, hyperparams=hyperparams, epochs=epochs, verbose=verbose)
 
-    predict_proba_fn = dnn_predict_proba(model, feature_cols)
+    predict_proba_fn = dnn_predict_proba(model, tokenizer, feature_cols)
     metrics = evaluate_model(predict_proba_fn, df_test, "Label")
 
     output.parent.mkdir(parents=True, exist_ok=True)
-    model.save(output)
-    logger.info(f"Saved trained model to {output}")
+    weights_file = output.with_suffix(".weights.h5")
+    model.save_weights(weights_file)
+    logger.info(f"Saved model weights summary to {weights_file}")
+  
+    tokenizer_file = output.with_suffix(".tokenizer.json")
+    tokenizer.save(str(tokenizer_file))
+    logger.info(f"Saved tokenizer to {tokenizer_file}")
+             
+    manifest = build_manifest("dnn", output, feature_cols, hyperparameters=hyperparams)
+    manifest_path = output.with_suffix(".manifest.json")
+    manifest_path.write_text(json.dumps(manifest, indent=2))
+    logger.info(f"Saved model manifest to {manifest_path}")
 
     summary = { 
         "operation": "dnn train",
@@ -155,20 +165,16 @@ def dnn_train(
         },
         "metrics": build_metrics_summary(metrics)
     }
-
     metrics_path = output.with_suffix(".metrics.json")
     metrics_path.write_text(json.dumps(summary, indent=2))
     logger.info(f"Saved metrics summary to {metrics_path}")
+        
+    logger.info(f"Saved trained model to {output}")
+    
 
-    manifest = build_manifest("dnn", output, feature_cols, hyperparameters=hyperparams)
-    manifest_path = output.with_suffix(".manifest.json")
-    manifest_path.write_text(json.dumps(manifest, indent=2))
-    logger.info(f"Saved model manifest to {manifest_path}")
+  
 
-    vocabulary = model.get_layer("text_vectorization").get_vocabulary()
-    vocabulary_path = output.with_suffix(".vocabulary.json")
-    vocabulary_path.write_text(json.dumps(vocabulary))
-    logger.info(f"Saved model vocabulary to {vocabulary_path}")
+  
 
 @dnn_app.command("tune")
 def dnn_tune(

@@ -11,14 +11,29 @@ import joblib
 from typing import Callable
 from pathlib import Path
 
+from tokenizers import Tokenizer
+from capstone.tokenization.tokenization import PAD_TOKEN
+
+# Wrap the tokenizer to allow joblib pickling to work correctly
+class _HFTokenize:
+    def __init__(self, tokenizer: Tokenizer):
+        self.tokenizer = tokenizer
+
+    def __call__(self, text: str) -> list[str]:
+         return [token for token in self.tokenizer.encode(text).tokens if token != PAD_TOKEN]
+
 def classical_predict_proba(pipeline: Pipeline) -> Callable[[pd.DataFrame], np.ndarray]:
     def predict(df: pd.DataFrame) -> np.ndarray:
           return pipeline.predict_proba(df)[:,1]
     return predict
 
-def build_classical_pipeline(feature_cols: list[str]) -> Pipeline:
+def build_classical_pipeline(feature_cols: list[str], tokenizer : Tokenizer) -> Pipeline:
     preprocessor = ColumnTransformer([
-        ("tfidf", TfidfVectorizer(stop_words="english"), "text"),
+        ("tfidf", TfidfVectorizer(
+             tokenizer =_HFTokenize(tokenizer),
+             token_pattern=None,
+             lowercase=False
+             ),  "text"),
         ("engineered", StandardScaler(), feature_cols)
     ])
 
@@ -30,6 +45,7 @@ def build_classical_pipeline(feature_cols: list[str]) -> Pipeline:
 def train_classical_model(
             df_train: pd.DataFrame,
             feature_cols: list[str],
+            tokenizer: Tokenizer,
             label_col: str = "Label",
             param_grid : dict | None = None,
             n_jobs : int = -1,
@@ -56,7 +72,7 @@ def train_classical_model(
                 "features__tfidf__ngram_range": [(1, 1), (1, 2)]
             }
 
-        pipeline = build_classical_pipeline(feature_cols)
+        pipeline = build_classical_pipeline(feature_cols, tokenizer)
 
         # Sweep across hyperparameters
         grid = GridSearchCV(
@@ -75,6 +91,7 @@ def train_classical_model(
 def train_classical_model_cached(cache_path : Path, 
         df_train: pd.DataFrame,
         feature_cols: list[str],
+        tokenizer: Tokenizer,
         label_col: str = "Label",
         param_grid : dict | None = None,
         n_jobs : int = -1,
@@ -89,6 +106,7 @@ def train_classical_model_cached(cache_path : Path,
     grid = train_classical_model(
         df_train = df_train, 
         feature_cols = feature_cols, 
+        tokenizer = tokenizer,
         label_col = label_col, 
         param_grid = param_grid, 
         n_jobs = n_jobs, 

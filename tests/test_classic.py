@@ -1,5 +1,6 @@
 import pandas as pd
 from capstone.classic import train_classical_model
+from capstone.tokenization.tokenization import train_tokenizer
 
 def test_train_classic_model():
     df_train = pd.DataFrame({
@@ -15,11 +16,14 @@ def test_train_classic_model():
         "Label": [0, 0, 1, 1, 1, 1]
     })
 
+    tokenizer = train_tokenizer(df_train["text"], vocab_size=200, output_sequence_length=64)
+
     small_grid = { "clf__C": [0.1, 1.0]}
 
     grid = train_classical_model(
         df_train,
         feature_cols = ["feature_a"],
+        tokenizer=tokenizer,
         param_grid=small_grid,
         n_jobs=1,
         cv=2

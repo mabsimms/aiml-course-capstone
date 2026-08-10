@@ -28,8 +28,7 @@ def build_dnn_model(
     dense_units : int = 32,
     dropout_rate : float = 0.3,
     learning_rate : float = 1e-3,
-    use_cudnn : str | bool = "auto",
-    vocabulary : list[str] | None = None
+    use_cudnn : str | bool = "auto"    
 ) -> keras.Model:
     logger.info(
         "Building DNN model: vocab_size=%s, output_sequence_length=%s, embedding_dim=%s, "

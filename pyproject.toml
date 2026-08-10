@@ -44,6 +44,9 @@ prerelease-package = { tensorflow = "allow" }
 markers = [
     "train: marks slow training tests",
 ]
+filterwarnings = [
+    "ignore:__array__ implementation doesn't accept a copy keyword:DeprecationWarning",
+]
 
 [dependency-groups]
 dev = [

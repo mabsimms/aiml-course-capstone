@@ -38,7 +38,8 @@ def test_build_dnn_model():
         output_sequence_length=16,
         embedding_dim=8,
         lstm_units=4,
-        dense_units=4
+        dense_units=4,
+        use_cudnn=False
     )
     assert model.optimizer is not None
 
@@ -86,7 +87,8 @@ def test_dnn_save_load_roundtrip(tmp_path):
         "output_sequence_length": 32,
         "embedding_dim": 8,
         "lstm_units": 4,
-        "dense_units": 4
+        "dense_units": 4,
+        "use_cudnn": False
     }
 
     model, _, _, tokenizer = train_dnn(df_train, feature_cols=["feature_a"], verbose=0)
