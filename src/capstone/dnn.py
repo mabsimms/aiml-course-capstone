@@ -1,24 +1,26 @@
+from __future__ import annotations
+# Allow lazy-loaded type definitions in function signatures
+
 import pandas as pd
 import numpy as np
-import tensorflow as tf
-import keras
 
 from tokenizers import Tokenizer
 
 from capstone.tokenization.tokenization import train_tokenizer, save_tokenizer, load_tokenizer, PAD_TOKEN, UNK_TOKEN
 
 from pathlib import Path
-import tempfile
-import zipfile
-import tensorflow as tf
 from sklearn.utils.class_weight import compute_class_weight
 import inspect
 
 import logging
 logger = logging.getLogger("capstone")
 
-def _lowercase_only(input_text):
-    return tf.strings.lower(input_text)
+from typing import TYPE_CHECKING
+
+# Allow lazy-loaded type definitions in function signatures
+if TYPE_CHECKING:
+    import keras
+    import tensorflow as tf
 
 def build_dnn_model(    
     train_features: np.ndarray,
@@ -31,6 +33,9 @@ def build_dnn_model(
     learning_rate : float = 1e-3,
     use_cudnn : str | bool = "auto"    
 ) -> keras.Model:
+    import keras
+    import tensorflow as tf
+
     logger.info(
         "Building DNN model: vocab_size=%s, output_sequence_length=%s, embedding_dim=%s, "
         "lstm_units=%s, dense_units=%s, dropout_rate=%s, learning_rate=%s, use_cudnn=%s",
@@ -108,6 +113,7 @@ def train_dnn(
         epochs : int = 15,
         verbose : int = 1
 ) -> tuple[keras.Model, keras.callbacks.History, dict, Tokenizer]:
+    import keras
     if hyperparams is None:
         hyperparams = {}
 

@@ -1,12 +1,11 @@
 import time
 import os
 import platform
-import tensorflow as tf
 from contextlib import contextmanager
 import logging
 import subprocess
 import psutil
-import git
+
 
 logger = logging.getLogger("capstone")
 
@@ -23,6 +22,7 @@ def log_duration(operation : str):
         logger.info("%s completed in %.1f seconds", operation, timing["seconds"])
 
 def get_machine_info() -> dict:
+    import tensorflow as tf
     gpus = tf.config.list_physical_devices("GPU")
     gpu_names = []
     for gpu in gpus:
@@ -69,6 +69,7 @@ def build_metrics_summary(metrics: dict, threshold: float = 0.5) -> dict:
     }
 
 def get_git_info() -> dict | None:
+    import git
     try:
         repo = git.Repo(search_parent_directories=True)
         head_commit = repo.head.commit

@@ -1,6 +1,5 @@
 import json
 import joblib
-import keras
 
 import pandas as pd
 import numpy as np
@@ -11,6 +10,7 @@ from dataclasses import dataclass
 
 from capstone.classic import classical_predict_proba
 from capstone.dnn import dnn_predict_proba, load_dnn_model
+from capstone.gpu import configure_gpu
 from capstone.manifest import SCHEMA_VERSION
 
 @dataclass
@@ -38,6 +38,8 @@ def load_predictor(manifest_path : Path) -> Predictor:
         pipeline = joblib.load(artifact_path)
         predict = classical_predict_proba(pipeline)
     elif model_type == "dnn":        
+        configure_gpu()
+        
         weights_path = artifact_path.with_suffix(".weights.h5")
         tokenizer_path = artifact_path.with_suffix(".tokenizer.json")
         model, tokenizer = load_dnn_model(

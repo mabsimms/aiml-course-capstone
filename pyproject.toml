@@ -73,3 +73,7 @@ training = [
     "seaborn>=0.13.2",
     "tensorboard>=2.21.0",
 ]
+# Load testing
+loadtest = [ 
+    "locust>=2.32.0"
+]

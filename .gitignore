@@ -1,6 +1,12 @@
 # Local files
 artifacts/*
 
+# Load testing artifacts
+loadtest-results/*
+
+# Ignore swap files
+*.swp
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

@@ -8,6 +8,9 @@
   warnings.warn(
 ```
 
-- [x ] Save the chosen weights out to be used at inference time
-
-- [ ] Update the runner training/tuning scripts to fail if any uncomitted git changes, add git hash to the output logs and summary
+- [x] Save the chosen weights out to be used at inference time
+- [x] Update the runner training/tuning scripts to fail if any uncomitted git changes, add git hash to the output logs and summary
+- [ ] Add OpenTelemetry logging and a local self-contained otel docker-compose instance to visualize
+- [ ] Reimplement with PyTorch
+- [x] Configure tensorflow to lazy load
+- [ ] Do the capstone technical and non-technical writeups

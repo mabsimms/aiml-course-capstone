@@ -13,7 +13,6 @@ from enum import Enum
 from capstone.dataset import prepare_experiment
 from capstone.classic import build_classical_pipeline, classical_predict_proba, train_classical_model
 from capstone.dnn import train_dnn, dnn_predict_proba
-from capstone.dnn_tuner import tune_dnn
 from capstone.utils import log_duration, get_machine_info, build_metrics_summary, get_git_info
 from capstone.evaluate import evaluate_model
 from capstone.gpu import configure_gpu
@@ -116,6 +115,9 @@ def dnn_train(
     output: Path = typer.Option(..., help="Target file template for the trained model artifacts"),
     epochs: int = typer.Option(15, help="Maximum training runs (epochs)")
 ):
+    detected_gpus = configure_gpu()
+    logger.info("GPU configuration: %s", detected_gpus)
+      
     df_train, df_test, feature_cols = resolve_training_data(file, directory)
     hyperparams = json.loads(config.read_text())
     
@@ -221,6 +223,11 @@ def dnn_tune(
     project_name : str = typer.Option("dnn_search"),
     overwrite : bool = typer.Option(False, "--overwrite", help="Start a fresh search, discarding any existing trials in --tuner-dir")
 ):
+    from capstone.dnn_tuner import tune_dnn
+    
+    detected_gpus = configure_gpu()
+    logger.info("GPU configuration: %s", detected_gpus)
+      
     with log_duration("dnn tune") as timing:
         df_train, df_test, feature_cols = resolve_training_data(file, directory)
         search_space = json.loads(config.read_text())
@@ -276,9 +283,7 @@ def main(
 ):
     logging.basicConfig(level=_LOG_LEVEL_MAP[verbose], format="%(asctime)s %(levelname)s %(name)s: %(message)s", force=True)
     ctx.obj = verbose
-
-    detected_gpus = configure_gpu()
-    logger.info("GPU configuration: %s", detected_gpus)
+  
     
 if __name__ == "__main__":
     app()

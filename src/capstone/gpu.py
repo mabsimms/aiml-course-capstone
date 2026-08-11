@@ -1,7 +1,7 @@
-import tensorflow as tf
 import os
 
 def configure_gpu(mode: str | None = None) -> list:
+    import tensorflow as tf
     if mode is None:
         mode = os.environ.get("GPU_MODE", "auto")
 

@@ -9,14 +9,11 @@ import pandas as pd
 from fastapi import FastAPI, Request
 
 from capstone.features import engineer_features
-from capstone.gpu import configure_gpu
 from capstone.predictor import Predictor, load_predictor
 from capstone.schemas import Message, ScoreRequest, ScoreResult, ScoreResponse
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    configure_gpu()
-
     manifest_path = Path(os.environ["MODEL_MANIFEST_PATH"])
     app.state.predictor = load_predictor(manifest_path)
     yield
