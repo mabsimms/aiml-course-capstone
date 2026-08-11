@@ -13,6 +13,7 @@ dependencies = [
     "ipywidgets>=8.1.8",
     "jupyter>=1.1.1",
     "kagglehub>=1.0.2",
+    "keras-tuner>=1.4.8",
     "pandas>=3.0.5",
     "pydantic>=2.13.4",
     "scikit-learn>=1.9.0",
@@ -20,7 +21,8 @@ dependencies = [
     "setuptools>=83.0.0",
     #"tensorflow==2.22.0",
     #"tensorflow==2.22.0.dev0+selfbuilt ; sys_platform == 'linux'",
-	# Use the local RTX5090 friendly Tensorflow build (LFS)
+    # Use the local RTX5090 friendly Tensorflow build (LFS)
+    "tensorboard>=2.21.0",
     "tensorflow==2.22.0.dev0+selfbuilt ; sys_platform == 'linux'",
     #"tensorflow>=2.18.1,<2.22 ; sys_platform == 'darwin'",
     #"tensorflow-metal>=1.2.0 ; sys_platform == 'darwin'",

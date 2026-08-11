@@ -11,12 +11,14 @@ import logging
 from enum import Enum
 
 from capstone.dataset import prepare_experiment
-from capstone.classic import build_classical_pipeline, classical_predict_proba
+from capstone.classic import build_classical_pipeline, classical_predict_proba, train_classical_model
 from capstone.dnn import train_dnn, dnn_predict_proba
+from capstone.dnn_tuner import tune_dnn
 from capstone.utils import log_duration, get_machine_info, build_metrics_summary
 from capstone.evaluate import evaluate_model
 from capstone.gpu import configure_gpu
 from capstone.manifest import build_manifest
+from capstone.tokenization.tokenization import train_tokenizer
 
 class LogLevel(str, Enum):
     info = "info"
@@ -77,8 +79,9 @@ def classic_train(
     hyperparams = json.loads(config.read_text())
     if "features__tfidf__ngram_range" in hyperparams:
         hyperparams["features__tfidf__ngram_range"] = tuple(hyperparams["features__tfidf__ngram_range"])
+    tokenizer = train_tokenizer(df_train["text"])
 
-    pipeline = build_classical_pipeline(feature_cols)
+    pipeline = build_classical_pipeline(feature_cols, tokenizer)
     pipeline.set_params(**hyperparams)
 
     with log_duration("Training classic model") as timing:
@@ -108,6 +111,10 @@ def classic_train(
     metrics_path = output.with_suffix(".metrics.json")
     metrics_path.write_text(json.dumps(summary, indent=2))
     logger.info(f"Saved metrics summary to {metrics_path}")
+
+    tokenizer_file = output.with_suffix(".tokenizer.json")
+    tokenizer.save(str(tokenizer_file))
+    logger.info(f"Saved tokenizer to {tokenizer_file}")
 
     manifest = build_manifest("classic", output, feature_cols)
     manifest_path = output.with_suffix(".manifest.json")
@@ -171,8 +178,77 @@ def dnn_train(
         
     logger.info(f"Saved trained model to {output}")
     
-
+@classic_app.command("tune")
+def classic_tune(
+    ctx: typer.Context,
+    config: Path = typer.Option(..., exists=True, help="JSON search space"),
+    file: Optional[Path] = typer.Option(None, help="Single raw source CSV"),
+    directory: Optional[Path] = typer.Option(None, help="Directory of raw per-source CSVs"),
+    output: Path = typer.Option(..., help="Target file for the trained model (.joblib)"),
+    cv : int = typer.Option(5, help="Number of cross validation folds"),
+    n_jobs : int = typer.Option(-1, help="Parallel jobs for GridSearchCV")
+):
+    df_train, df_test, feature_cols = resolve_training_data(file, directory)
   
+    search_space = json.loads(config.read_text())
+    if "features__tfidf__ngram_range" in search_space:
+        search_space["features__tfidf__ngram_range"] = [
+            tuple(r) for r in search_space["features__tfidf__ngram_range"]
+        ]
+
+    tokenizer = train_tokenizer(df_train["text"])
+
+    with log_duration("Tuning classic model") as timing:
+        grid = train_classical_model(
+            df_train=df_train,
+            feature_cols=feature_cols,
+            tokenizer=tokenizer,
+            param_grid=search_space,
+            cv=cv,
+            n_jobs=n_jobs,
+            verbose=1
+        )
+
+    pipeline = grid.best_estimator_
+    predict_proba_fn = classical_predict_proba(pipeline)
+    metrics = evaluate_model(predict_proba_fn, df_test, "Label")
+
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(pipeline, output)
+    logger.info(f"Saved trained model to {output}")
+
+    summary = { 
+        "operation": "classic train",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "duration_seconds": timing["seconds"],
+        "machine": get_machine_info(),
+        "input_data": { 
+            "train_rows": len(df_train),
+            "test_rows": len(df_test),
+            "num_features": len(feature_cols)
+        },
+        "search_space": search_space,
+        "cv_folds": cv,
+        "best_params": grid.best_params_,
+        "best_cv_f1": grid.best_score_,
+        "metrics": build_metrics_summary(metrics)
+    }
+
+    metrics_path = output.with_suffix(".metrics.json")
+    metrics_path.write_text(json.dumps(summary, indent=2))
+    logger.info(f"Saved metrics summary to {metrics_path}")
+
+    tokenizer_file = output.with_suffix(".tokenizer.json")
+    tokenizer.save(str(tokenizer_file))
+    logger.info(f"Saved tokenizer to {tokenizer_file}")
+
+    manifest = build_manifest("classic", output, feature_cols)
+    manifest_path = output.with_suffix(".manifest.json")
+    manifest_path.write_text(json.dumps(manifest, indent=2))
+    logger.info(f"Saved model manifest to {manifest_path}")
+
+
 
   
 
@@ -187,49 +263,57 @@ def dnn_tune(
     epochs: int = typer.Option(15, help="Maximum training runs (epochs)"),
     tuner_dir : Path = typer.Option("artifacts/tuner"),
     project_name : str = typer.Option("dnn_search"),
-    overwrite : bool = typer.Option(False, "--overwrite", help="Start a fresh search, disciarding any existing trials in --tuner-dir")
+    overwrite : bool = typer.Option(False, "--overwrite", help="Start a fresh search, discarding any existing trials in --tuner-dir")
 ):
-	pass
+    with log_duration("dnn tune") as timing:
+        df_train, df_test, feature_cols = resolve_training_data(file, directory)
+        search_space = json.loads(config.read_text())
+        verbose = _KERAS_VERBOSE_MAP[ctx.obj]
 
-    #with log_duration("dnn tune") as timing:
-    #    df_train, df_test, feature_cols = resolve_training_data(file, directory)
-    #    search_space = json.loads(config.read_text())
-    #    verbose = _KERAS_VERBOSE_MAP[ctx.obj]
-#
-#        result = tune_dnn(df_train, feature_cols, 
-#                          search_space=search_space,
-#                          fixed_hyperparameters={"use_cudnn": True},
-#                          max_trials=max_trials,
-#                          epochs=epochs,
-#                          tuner_dir=tuner_dir,
-#                          project_name=project_name,
-#                          overwrite=overwrite,
-#                          verbose=verbose,
-#        )
-#        output.parent.mkdir(parents=True, exist_ok=True)
-#        output.write_text(json.dumps(result["hyperparameters"], indent=2))
-#        logger.info("Saved best hyperparameters to {output}")
-#
-#        summary = { 
-#            "operation": "dnn train",
-#            "timestamp": datetime.now(timezone.utc).isoformat(),
-#            "duration_seconds": timing["seconds"],
-#            "machine": get_machine_info(),
-#            "input_data": { 
-#                "train_rows": len(df_train),
-#                "test_rows": len(df_test),
-#                "num_features": len(feature_cols)
-#            },
-#            "search_space": search_space,
-#            "max_trials": max_trials,
-#            "epochs_per_trial": epochs,
-#            "trials_completed": result["trials_completed"],
-#            "best_val_loss": result["best_val_loss"],
-#            "best_hyperparameters": result["hyperparameters"]
-#        }
-#        summary_path = output.with_suffix(".summary.json")
-#        summary_path.write_text(json.dumps(summary, indent=2))
-#        logger.info(f"Saved metrics summary to {summary_path}")
+        result = tune_dnn(
+            df_train=df_train,
+            feature_cols=feature_cols,
+            search_space=search_space,
+            fixed_hyperparameters={
+                # Use CuDNN where available (5x speed increase over raw GPU)
+                "use_cudnn": "auto",
+                # Optimal tokenizer configuration on this data set (from parametric sweep)
+                "max_tokens": 40_000,
+                # Optimal tokenizer configuration on this data set (from parametric sweep)
+                "output_sequence_length": 6_000
+            },
+            max_trials=max_trials,
+            epochs=epochs,
+            tuner_dir=tuner_dir,
+            project_name=project_name,
+            overwrite=overwrite,
+            verbose=verbose
+        )
+                 
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(result["hyperparameters"], indent=2))
+        logger.info("Saved best hyperparameters to {output}")
+
+        summary = { 
+            "operation": "dnn train",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "duration_seconds": timing["seconds"],
+            "machine": get_machine_info(),
+            "input_data": { 
+                "train_rows": len(df_train),
+                "test_rows": len(df_test),
+                "num_features": len(feature_cols)
+            },
+            "search_space": search_space,
+            "max_trials": max_trials,
+            "epochs_per_trial": epochs,
+            "trials_completed": result["trials_completed"],
+            "best_val_loss": result["best_val_loss"],
+            "best_hyperparameters": result["hyperparameters"]
+        }
+        summary_path = output.with_suffix(".summary.json")
+        summary_path.write_text(json.dumps(summary, indent=2))
+        logger.info(f"Saved metrics summary to {summary_path}")
 
 
 @app.callback()

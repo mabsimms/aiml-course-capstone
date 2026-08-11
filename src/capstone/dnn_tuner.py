@@ -8,10 +8,11 @@ import keras
 import logging
 logger = logging.getLogger("capstone")
 
-from capstone.dnn import build_dnn_model
+from capstone.dnn import build_dnn_model, _encode_text
 from pathlib import Path
 
 from sklearn.utils.class_weight import compute_class_weight
+from capstone.tokenization.tokenization import train_tokenizer, PAD_TOKEN
 
 _HP_DISPATCH = { 
     "int": "Int",
@@ -19,20 +20,33 @@ _HP_DISPATCH = {
     "choice": "Choice"
 }
 
+# Ignore these tokenizer specific keys during tuning runs
+_TOKENIZER_KEYS = { 
+    "max_tokens",    
+    "min_frequency"
+}
+
 class SpamHyperModel(kt.HyperModel):
     # HyperModel subclassing (build(self, hp) contract): https://keras.io/keras_tuner/api/hypermodels/
     # Config-driven search space: https://keras.io/keras_tuner/guides/tailor_the_search_space/
     def __init__(
             self,
-            train_text: np.ndarray,
-            train_features: np.ndarray,
+            encoded_text: np.ndarray,
+            numeric_features: np.ndarray,
+            vocab_size: int,
             search_space: dict,
             fixed_hyperparameters: dict | None = None
     ):
-        self.train_text = train_text
-        self.train_features = train_features
+        self.encoded_text = encoded_text
+        self.numeric_features = numeric_features
+        self.vocab_size = vocab_size
+       
         self.search_space = search_space
-        self.fixed_hyperparameters = fixed_hyperparameters
+
+        # Filter out tokenizer keys
+        self.fixed_hyperparameters = {
+            k: v for k, v in (fixed_hyperparameters or {}).items() if k not in _TOKENIZER_KEYS
+        } 
 
     def build(self, hp: kt.HyperParameters) -> keras.Model:
         sampled = {}
@@ -41,7 +55,7 @@ class SpamHyperModel(kt.HyperModel):
             method_name = _HP_DISPATCH[spec.pop("type")]
             sampled[name] = getattr(hp, method_name)(name, **spec)
         hyperparams = { **sampled, **self.fixed_hyperparameters }
-        return build_dnn_model(self.train_text, self.train_features, **hyperparams)
+        return build_dnn_model(self.numeric_features, self.vocab_size, **hyperparams)
 
 
 def tune_dnn(
@@ -67,13 +81,29 @@ def tune_dnn(
             y=df_train["Label"]
     )      
     class_weight_dict = dict(zip(np.unique(df_train["Label"]), class_weights))
-    train_text = df_train["text"].to_numpy(dtype=object)
     train_features = df_train[feature_cols].to_numpy(dtype=np.float64)
+
+    max_tokens = fixed_hyperparameters.get("max_tokens", 20_000)
+    output_sequence_length = fixed_hyperparameters.get("output_sequence_length", 4_500)
+    min_frequency = fixed_hyperparameters.get("min_frequency", 0)
+
+    tokenizer = train_tokenizer(
+        df_train["text"],
+        vocab_size=max_tokens,
+        output_sequence_length=output_sequence_length,
+        min_frequency=min_frequency
+    )
+    # Ensure that the padding token is the first in the vocabulary set
+    assert tokenizer.token_to_id(PAD_TOKEN) == 0, "Expected PAD token id 0"
+    encoded_text = _encode_text(tokenizer, df_train["text"])
 
     logger.info("Starting keras tuner search; max_trials=%s, epochs=%s, search_space=%s", 
                 max_trials, epochs, list(search_space.keys()))
 
-    hypermodel = SpamHyperModel(train_text, train_features, search_space, fixed_hyperparameters)
+    hypermodel = SpamHyperModel(
+        encoded_text, train_features, tokenizer.get_vocab_size(), search_space, fixed_hyperparameters
+    )
+
     tuner = kt.RandomSearch(
         hypermodel,
         objective="val_loss",
@@ -92,7 +122,7 @@ def tune_dnn(
 
     tuner.search(
          {
-            "text": train_text,
+            "text": encoded_text,
             "engineered_features": train_features
         },
         df_train["Label"],

@@ -17,10 +17,12 @@ from capstone.tokenization.tokenization import PAD_TOKEN
 # Wrap the tokenizer to allow joblib pickling to work correctly
 class _HFTokenize:
     def __init__(self, tokenizer: Tokenizer):
+        tokenizer.no_truncation()
+        tokenizer.no_padding()
         self.tokenizer = tokenizer
 
     def __call__(self, text: str) -> list[str]:
-         return [token for token in self.tokenizer.encode(text).tokens if token != PAD_TOKEN]
+         return self.tokenizer.encode(text).tokens
 
 def classical_predict_proba(pipeline: Pipeline) -> Callable[[pd.DataFrame], np.ndarray]:
     def predict(df: pd.DataFrame) -> np.ndarray:

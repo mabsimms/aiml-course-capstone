@@ -18,7 +18,8 @@ UNK_TOKEN = "[UNK]"
 def train_tokenizer(
     text: pd.Series,
     vocab_size: int = 20_000,
-    output_sequence_length = 3_000
+    output_sequence_length = 3_000,
+    min_frequency : int = 0
 ) -> Tokenizer:
     tokenizer = Tokenizer(BPE(unk_token=UNK_TOKEN))
     tokenizer.pre_tokenizer = ByteLevel(add_prefix_space=True)
@@ -26,6 +27,7 @@ def train_tokenizer(
 
     trainer = BpeTrainer(
         vocab_size=vocab_size,
+        min_frequency=min_frequency,
         special_tokens=[PAD_TOKEN, UNK_TOKEN],
         initial_alphabet=ByteLevel.alphabet()
     )

@@ -22,7 +22,7 @@ def _lowercase_only(input_text):
 def build_dnn_model(    
     train_features: np.ndarray,
     vocab_size : int,    
-    output_sequence_length : int = 3000,
+    output_sequence_length : int = 4_500,
     embedding_dim : int = 64,
     lstm_units : int = 64,
     dense_units : int = 32,
@@ -128,17 +128,24 @@ def train_dnn(
     train_features = df_train[feature_cols].to_numpy(dtype=np.float64)
 
     max_tokens = hyperparams.get("max_tokens", 20_000)
-    output_sequence_length = hyperparams.get("output_sequence_length", 3_000)
+    output_sequence_length = hyperparams.get("output_sequence_length", 4_500)
+    min_frequency = hyperparams.get("min_frequency", 0)
 
     tokenizer = train_tokenizer(
         df_train["text"],
         vocab_size=max_tokens,
-        output_sequence_length=output_sequence_length
+        output_sequence_length=output_sequence_length,
+        min_frequency=min_frequency
     )
     assert tokenizer.token_to_id(PAD_TOKEN) == 0, "Expected PAD token id 0"    
     encoded_text = _encode_text(tokenizer, df_train["text"])
 
-    model = build_dnn_model(train_features, tokenizer.get_vocab_size(), **hyperparams)
+    # Do not pass max_tokens through
+    model_hyperparameters = { 
+        k: v for k, v in hyperparams.items() if k not in ("max_tokens", "min_frequency")
+    }
+    model = build_dnn_model(train_features, tokenizer.get_vocab_size(), 
+                            **model_hyperparameters)
 
     early_stopping = keras.callbacks.EarlyStopping(
                     monitor="val_loss",
