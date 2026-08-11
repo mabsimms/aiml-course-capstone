@@ -5,7 +5,8 @@ set -euo pipefail
 # Require clean repo
 bash "$(dirname "${BASH_SOURCE[0]}")/check-git.sh" || exit 1
 
-DIRECTORY="/home/masimms/.cache/kagglehub/datasets/nitishabharathi/email-spam-dataset/versions/1"
+# Download data and set KAGGLE_DIRECTORY
+source "$(dirname "${BASH_SOURCE[0]}")/resolve-kaggle-directory.sh"
 
 for config in configs/dnn/*.json; do
     name=$(basename "$config" .json)
@@ -15,7 +16,7 @@ for config in configs/dnn/*.json; do
 
     if [ ! -f ${OUTPUT} ]; then
         uv run python -m capstone.cli --verbose info dnn train \
-            --directory "$DIRECTORY" \
+            --directory "${KAGGLE_DIRECTORY}" \
             --config "$config" \
             --output "artifacts/dnn_${name}.keras" \
             2>&1 | tee "${OUTPUT}.log"
@@ -28,7 +29,7 @@ done
 echo "Running training on DNN model baseline (forced CPU_ONLY)"
 if [ ! -f "artifacts/classic_baseline_nocpu.keras" ]; then
     GPU_MODE=force_cpu uv run python -m capstone.cli --verbose info dnn train \
-            --directory "$DIRECTORY" \
+            --directory "${KAGGLE_DIRECTORY}" \
             --config ./configs/dnn/baseline.json \
             --output "artifacts/dnn_baseline_nocpu.keras" \
             2>&1 | tee "artifacts/dnn_baseline_nocpu.keras.log"

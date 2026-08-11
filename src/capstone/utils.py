@@ -75,7 +75,7 @@ def get_git_info() -> dict | None:
         return { 
             "commit": head_commit.hexsha,
             "branch": None if repo.head.is_detached else repo.active_branch.name,
-            "commit_timestamp": head_commit.commited_datetime.isoformat(),
+            "commit_timestamp": head_commit.committed_datetime.isoformat(),
             "dirty": repo.is_dirty(untracked_files=True)
         }
     except Exception:
