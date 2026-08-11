@@ -1,0 +1,8 @@
+{
+    "host": "http://localhost:8001",
+    "duration" : "120s",
+    "spawn_rate": 5,
+    "sample_pool_size": 500,
+    "concurrency_levels": [1, 5, 10, 25, 50],
+    "batch_sizes": [1, 2, 5, 10, 20]
+}
