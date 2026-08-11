@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "fastapi>=0.141.1",
+    "gitpython>=3.1.59",
     "ipykernel>=7.3.0",
     "ipywidgets>=8.1.8",
     "jupyter>=1.1.1",

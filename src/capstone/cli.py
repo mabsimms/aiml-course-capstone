@@ -14,10 +14,10 @@ from capstone.dataset import prepare_experiment
 from capstone.classic import build_classical_pipeline, classical_predict_proba, train_classical_model
 from capstone.dnn import train_dnn, dnn_predict_proba
 from capstone.dnn_tuner import tune_dnn
-from capstone.utils import log_duration, get_machine_info, build_metrics_summary
+from capstone.utils import log_duration, get_machine_info, build_metrics_summary, get_git_info
 from capstone.evaluate import evaluate_model
 from capstone.gpu import configure_gpu
-from capstone.manifest import build_manifest
+from capstone.manifest import build_manifest, save_training_artifacts
 from capstone.tokenization.tokenization import train_tokenizer
 
 class LogLevel(str, Enum):
@@ -95,10 +95,8 @@ def classic_train(
     logger.info(f"Saved trained model to {output}")
 
     summary = { 
-        "operation": "classic train",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "duration_seconds": timing["seconds"],
-        "machine": get_machine_info(),
+        "operation": "classic train",        
+        "duration_seconds": timing["seconds"],        
         "input_data": { 
             "train_rows": len(df_train),
             "test_rows": len(df_test),
@@ -107,19 +105,7 @@ def classic_train(
         "hyperparameters": hyperparams,
         "metrics": build_metrics_summary(metrics)
     }
-
-    metrics_path = output.with_suffix(".metrics.json")
-    metrics_path.write_text(json.dumps(summary, indent=2))
-    logger.info(f"Saved metrics summary to {metrics_path}")
-
-    tokenizer_file = output.with_suffix(".tokenizer.json")
-    tokenizer.save(str(tokenizer_file))
-    logger.info(f"Saved tokenizer to {tokenizer_file}")
-
-    manifest = build_manifest("classic", output, feature_cols)
-    manifest_path = output.with_suffix(".manifest.json")
-    manifest_path.write_text(json.dumps(manifest, indent=2))
-    logger.info(f"Saved model manifest to {manifest_path}")
+    save_training_artifacts(output, "classic", feature_cols, tokenizer, summary)
 
 @dnn_app.command("train")
 def dnn_train(
@@ -144,21 +130,10 @@ def dnn_train(
     weights_file = output.with_suffix(".weights.h5")
     model.save_weights(weights_file)
     logger.info(f"Saved model weights summary to {weights_file}")
-  
-    tokenizer_file = output.with_suffix(".tokenizer.json")
-    tokenizer.save(str(tokenizer_file))
-    logger.info(f"Saved tokenizer to {tokenizer_file}")
-             
-    manifest = build_manifest("dnn", output, feature_cols, hyperparameters=hyperparams)
-    manifest_path = output.with_suffix(".manifest.json")
-    manifest_path.write_text(json.dumps(manifest, indent=2))
-    logger.info(f"Saved model manifest to {manifest_path}")
-
+                   
     summary = { 
-        "operation": "dnn train",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "duration_seconds": timing["seconds"],
-        "machine": get_machine_info(),
+        "operation": "dnn train",       
+        "duration_seconds": timing["seconds"],        
         "input_data": { 
             "train_rows": len(df_train),
             "test_rows": len(df_test),
@@ -172,9 +147,9 @@ def dnn_train(
         },
         "metrics": build_metrics_summary(metrics)
     }
-    metrics_path = output.with_suffix(".metrics.json")
-    metrics_path.write_text(json.dumps(summary, indent=2))
-    logger.info(f"Saved metrics summary to {metrics_path}")
+    save_training_artifacts(output, "dnn", feature_cols, 
+                            tokenizer, summary, hyperparameters=hyperparams
+    )
         
     logger.info(f"Saved trained model to {output}")
     
@@ -213,16 +188,13 @@ def classic_tune(
     predict_proba_fn = classical_predict_proba(pipeline)
     metrics = evaluate_model(predict_proba_fn, df_test, "Label")
 
-
     output.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(pipeline, output)
     logger.info(f"Saved trained model to {output}")
 
     summary = { 
-        "operation": "classic train",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "duration_seconds": timing["seconds"],
-        "machine": get_machine_info(),
+        "operation": "classic train",        
+        "duration_seconds": timing["seconds"],        
         "input_data": { 
             "train_rows": len(df_train),
             "test_rows": len(df_test),
@@ -234,23 +206,7 @@ def classic_tune(
         "best_cv_f1": grid.best_score_,
         "metrics": build_metrics_summary(metrics)
     }
-
-    metrics_path = output.with_suffix(".metrics.json")
-    metrics_path.write_text(json.dumps(summary, indent=2))
-    logger.info(f"Saved metrics summary to {metrics_path}")
-
-    tokenizer_file = output.with_suffix(".tokenizer.json")
-    tokenizer.save(str(tokenizer_file))
-    logger.info(f"Saved tokenizer to {tokenizer_file}")
-
-    manifest = build_manifest("classic", output, feature_cols)
-    manifest_path = output.with_suffix(".manifest.json")
-    manifest_path.write_text(json.dumps(manifest, indent=2))
-    logger.info(f"Saved model manifest to {manifest_path}")
-
-
-
-  
+    save_training_artifacts(output, "classic", feature_cols, tokenizer, summary)         
 
 @dnn_app.command("tune")
 def dnn_tune(
@@ -276,11 +232,7 @@ def dnn_tune(
             search_space=search_space,
             fixed_hyperparameters={
                 # Use CuDNN where available (5x speed increase over raw GPU)
-                "use_cudnn": "auto",
-                # Optimal tokenizer configuration on this data set (from parametric sweep)
-                "max_tokens": 40_000,
-                # Optimal tokenizer configuration on this data set (from parametric sweep)
-                "output_sequence_length": 6_000
+                "use_cudnn": "auto",              
             },
             max_trials=max_trials,
             epochs=epochs,
@@ -299,6 +251,7 @@ def dnn_tune(
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "duration_seconds": timing["seconds"],
             "machine": get_machine_info(),
+            "git": get_git_info(),
             "input_data": { 
                 "train_rows": len(df_train),
                 "test_rows": len(df_test),

@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+# Require clean repo
+bash "$(dirname "${BASH_SOURCE[0]}")/check-git.sh" || exit 1
+
 DIRECTORY="/home/masimms/.cache/kagglehub/datasets/nitishabharathi/email-spam-dataset/versions/1"
 
 for config in configs/dnn/*.json; do

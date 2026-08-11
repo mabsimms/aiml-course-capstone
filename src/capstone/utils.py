@@ -6,6 +6,7 @@ from contextlib import contextmanager
 import logging
 import subprocess
 import psutil
+import git
 
 logger = logging.getLogger("capstone")
 
@@ -66,3 +67,16 @@ def build_metrics_summary(metrics: dict, threshold: float = 0.5) -> dict:
         "confusion_matrix": metrics["confusion_matrix"].tolist(),
         "classification_report": metrics["classification_report"],
     }
+
+def get_git_info() -> dict | None:
+    try:
+        repo = git.Repo(search_parent_directories=True)
+        head_commit = repo.head.commit
+        return { 
+            "commit": head_commit.hexsha,
+            "branch": None if repo.head.is_detached else repo.active_branch.name,
+            "commit_timestamp": head_commit.commited_datetime.isoformat(),
+            "dirty": repo.is_dirty(untracked_files=True)
+        }
+    except Exception:
+        return None

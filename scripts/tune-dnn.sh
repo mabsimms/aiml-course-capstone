@@ -5,6 +5,10 @@ set -euo pipefail
 DIRECTORY="/home/masimms/.cache/kagglehub/datasets/nitishabharathi/email-spam-dataset/versions/1"
 LOG_FILE="artifacts/tuner/dnn_search.log"
 
+# Require clean repo
+bash "$(dirname "${BASH_SOURCE[0]}")/check-git.sh" || exit 1
+
+
 mkdir -p "$(dirname "$LOG_FILE")"
 mkdir -p "artifacts/tuner/dnn_search"
 
