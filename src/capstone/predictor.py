@@ -37,10 +37,13 @@ def load_predictor(manifest_path : Path) -> Predictor:
     if model_type == "classic":
         pipeline = joblib.load(artifact_path)
         predict = classical_predict_proba(pipeline)
-    elif model_type == "dnn":
-        #model = keras.models.load_model(artifact_path)
-        model = load_dnn_model(artifact_path, feature_cols, manifest["hyperparameters"])
-        predict = dnn_predict_proba(model, feature_cols, verbose=0)
+    elif model_type == "dnn":        
+        weights_path = artifact_path.with_suffix(".weights.h5")
+        tokenizer_path = artifact_path.with_suffix(".tokenizer.json")
+        model, tokenizer = load_dnn_model(
+            weights_path, tokenizer_path, feature_cols, manifest["hyperparameters"]
+        )        
+        predict = dnn_predict_proba(model, tokenizer, feature_cols, verbose=0)
     else:
         raise ValueError(f"Unknown model type {model_type} in {manifest_path}")
 

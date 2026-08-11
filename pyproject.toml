@@ -7,40 +7,46 @@ authors = [
     { name = "Mark Simms", email = "masimms@outlook.com" }
 ]
 requires-python = ">=3.13,<3.14"
-dependencies = [
+
+# Baseline (common) dependency set
+dependencies = [ 
     "fastapi>=0.141.1",
     "gitpython>=3.1.59",
-    "ipykernel>=7.3.0",
-    "ipywidgets>=8.1.8",
-    "jupyter>=1.1.1",
-    "kagglehub>=1.0.2",
-    "keras-tuner>=1.4.8",
+    "joblib>=1.4.2",
     "pandas>=3.0.5",
+    "psutil>=6.0.0",
     "pydantic>=2.13.4",
     "scikit-learn>=1.9.0",
-    "seaborn>=0.13.2",
     "setuptools>=83.0.0",
-    #"tensorflow==2.22.0",
-    #"tensorflow==2.22.0.dev0+selfbuilt ; sys_platform == 'linux'",
-    # Use the local RTX5090 friendly Tensorflow build (LFS)
-    "tensorboard>=2.21.0",
-    "tensorflow==2.22.0.dev0+selfbuilt ; sys_platform == 'linux'",
-    #"tensorflow>=2.18.1,<2.22 ; sys_platform == 'darwin'",
-    #"tensorflow-metal>=1.2.0 ; sys_platform == 'darwin'",
     "tokenizers>=0.23.1",
     "typer>=0.27.0",
     "uvicorn>=0.52.0",
+    
+]
+
+[project.optional-dependencies]
+serving = [
+    "tensorflow==2.21.0",
 ]
 
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13.0"]
 build-backend = "uv_build"
 
-# Avoid pulling newest packages (supply chain attacks); static value will need to be periodically refreshed
 [tool.uv]
 find-links = ["./dependencies/wheels"]
 environments = ["sys_platform == 'linux'", "sys_platform == 'darwin'"]
 prerelease-package = { tensorflow = "allow" }
+
+# Training loads by default; serving is for docker builds
+conflicts = [ 
+    [
+        {group = "training"},
+        {extra = "serving"}
+    ]
+]
+
+default-groups = ["dev", "training"]
 
 # Configure pytest options
 [tool.pytest.ini_options]
@@ -54,4 +60,16 @@ filterwarnings = [
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+]
+
+# Additional packages for training
+training = [ 
+    "tensorflow==2.22.0.dev0+selfbuilt ; sys_platform == 'linux'",
+    "ipykernel>=7.3.0",
+    "ipywidgets>=8.1.8",
+    "jupyter>=1.1.1",
+    "kagglehub>=1.0.2",
+    "keras-tuner>=1.4.8",
+    "seaborn>=0.13.2",
+    "tensorboard>=2.21.0",
 ]

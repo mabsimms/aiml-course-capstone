@@ -12,6 +12,7 @@ import tempfile
 import zipfile
 import tensorflow as tf
 from sklearn.utils.class_weight import compute_class_weight
+import inspect
 
 import logging
 logger = logging.getLogger("capstone")
@@ -147,6 +148,13 @@ def train_dnn(
     model = build_dnn_model(train_features, tokenizer.get_vocab_size(), 
                             **model_hyperparameters)
 
+    # Record the full set of hyper parameters (including the defaults)
+    bound = inspect.signature(build_dnn_model).bind_partial(**model_hyperparameters)
+    bound.apply_defaults()
+    hyperparams.update(bound.arguments)
+    hyperparams["max_tokens"] = max_tokens
+    hyperparams["min_frequency"] = min_frequency
+
     early_stopping = keras.callbacks.EarlyStopping(
                     monitor="val_loss",
                     patience=3,
@@ -193,7 +201,11 @@ def load_dnn_model(
     tokenizer = load_tokenizer(str(tokenizer_path))
     dummy_features = np.zeros((1, len(feature_cols)), dtype=np.float64)
 
-    model = build_dnn_model(dummy_features, tokenizer.get_vocab_size(), **hyperparameters)
+    # Strip the tokenizer parameters
+    model_hyperparameters = { 
+        k : v for k, v in hyperparameters.items() if k not in ("max_tokens", "min_frequency")
+    }
+    model = build_dnn_model(dummy_features, tokenizer.get_vocab_size(), **model_hyperparameters)
     model.load_weights(weights_path)
      
     return model, tokenizer
