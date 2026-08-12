@@ -14,3 +14,4 @@
 - [ ] Reimplement with PyTorch
 - [x] Configure tensorflow to lazy load
 - [ ] Do the capstone technical and non-technical writeups
+- [ ] Explore using ONNX as the inference runtime

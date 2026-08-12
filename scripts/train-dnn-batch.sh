@@ -12,27 +12,29 @@ for config in configs/dnn/*.json; do
     name=$(basename "$config" .json)
     echo "Running training on DNN model: $name"
 
-    OUTPUT="artifacts/dnn_${name}.keras"
+    OUTPUT="artifacts/dnn_${name}"
 
-    if [ ! -f ${OUTPUT} ]; then
+    if [ ! -f ${OUTPUT}.metrics.json ]; then
         uv run python -m capstone.cli --verbose info dnn train \
             --directory "${KAGGLE_DIRECTORY}" \
             --config "$config" \
-            --output "artifacts/dnn_${name}.keras" \
+            --output "${OUTPUT}" \
             2>&1 | tee "${OUTPUT}.log"
     else
-        echo "Output file ${OUTPUT} exists; skipping"
+        echo "Output file ${OUTPUT}.metrics.json exists; skipping"
     fi
     
 done
 
 echo "Running training on DNN model baseline (forced CPU_ONLY)"
-if [ ! -f "artifacts/classic_baseline_nocpu.keras" ]; then
+OUTPUT="artifacts/dnn_baseline_nocpu"
+
+if [ ! -f "${OUTPUT}.metrics.json" ]; then
     GPU_MODE=force_cpu uv run python -m capstone.cli --verbose info dnn train \
             --directory "${KAGGLE_DIRECTORY}" \
             --config ./configs/dnn/baseline.json \
-            --output "artifacts/dnn_baseline_nocpu.keras" \
-            2>&1 | tee "artifacts/dnn_baseline_nocpu.keras.log"
+            --output "${OUTPUT}" \
+            2>&1 | tee "${OUTPUT}.log"
 else
-    echo "Output file artifacts/dnn__baseline_nocpu.keras exists; skipping"
+    echo "Output file ${OUTPUT}.metrics.json exists; skipping"
 fi
