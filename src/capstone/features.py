@@ -40,6 +40,13 @@ PUNCTUATION_NAMES = {
     "~": "tilde",
 }
 
+CORE_COLUMNS = [
+    'Source',
+    'Subject',
+    'Body',
+    'Label'
+]
+
 def engineer_features(
         df : pd.DataFrame, 
         subject_col : str = "Subject", 
@@ -112,3 +119,17 @@ def find_outliers(
         })
 
     return pd.DataFrame(rows)
+
+def summarize_features(df: pd.DataFrame) -> dict:
+    feature_cols = [c for c in df.columns if c not in CORE_COLUMNS]
+
+    summary = {
+        'shape/ratio features': [c for c in feature_cols if c.endswith(("_length", "_word_count", "_upper_ratio", "_digit_ratio"))],
+        'embedded/link flags':  [c for c in feature_cols if c.endswith(("_has_http_url", "_has_web_url"))],
+        'punctuation counts':   [c for c in feature_cols if any(c.endswith(f"_{s}_count") for s in PUNCTUATION_NAMES.values())],
+    }
+    summary['other'] = [c for c in feature_cols if c not in summary['shape/ratio features'] + summary['embedded/link flags'] + summary['punctuation counts']]
+    
+    df_out = pd.Series(summary, name="list").to_frame().rename_axis("category")
+    df_out['count'] = df_out['list'].apply(len)
+    return df_out[['count', 'list']]

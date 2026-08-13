@@ -1,0 +1,10 @@
+{
+  "embedding_dim": 32,
+  "lstm_units": 32,
+  "dense_units": 16,
+  "dropout_rate": 0.5,
+  "learning_rate": 0.00013290355241150667,
+  "max_tokens": 50000,
+  "output_sequence_length": 6000,
+  "use_cudnn": "auto"
+}

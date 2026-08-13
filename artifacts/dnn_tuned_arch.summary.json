@@ -1,0 +1,95 @@
+{
+  "operation": "dnn train",
+  "timestamp": "2026-08-11T22:05:03.913100+00:00",
+  "duration_seconds": null,
+  "machine": {
+    "platform": "Linux-6.12.0-160000.35-default-x86_64-with-glibc2.40",
+    "python_version": "3.13.14",
+    "cpu_count": 32,
+    "system_memory_gb": 94.0,
+    "tensorflow_version": "2.22.0-dev0+selfbuilt",
+    "gpus": [
+      "NVIDIA GeForce RTX 5090"
+    ],
+    "gpu_memory_info": {
+      "total_mb": 32607,
+      "used_mb": 30483
+    }
+  },
+  "git": {
+    "commit": "2b071e2691af0dfc474017c0f923ad1cf000f504",
+    "branch": "capstone-final",
+    "commit_timestamp": "2026-08-11T14:15:28-07:00",
+    "dirty": false
+  },
+  "input_data": {
+    "train_rows": 14053,
+    "test_rows": 3514,
+    "num_features": 74
+  },
+  "search_space": {
+    "embedding_dim": {
+      "type": "int",
+      "min_value": 32,
+      "max_value": 128,
+      "step": 32
+    },
+    "lstm_units": {
+      "type": "int",
+      "min_value": 32,
+      "max_value": 128,
+      "step": 32
+    },
+    "dense_units": {
+      "type": "int",
+      "min_value": 16,
+      "max_value": 64,
+      "step": 16
+    },
+    "dropout_rate": {
+      "type": "float",
+      "min_value": 0.1,
+      "max_value": 0.5,
+      "step": 0.1
+    },
+    "learning_rate": {
+      "type": "float",
+      "min_value": 0.0001,
+      "max_value": 0.01,
+      "sampling": "log"
+    },
+    "max_tokens": {
+      "type": "choice",
+      "values": [
+        20000,
+        30000,
+        40000,
+        50000,
+        60000
+      ]
+    },
+    "output_sequence_length": {
+      "type": "choice",
+      "values": [
+        3000,
+        4500,
+        6000,
+        7500
+      ]
+    }
+  },
+  "max_trials": 20,
+  "epochs_per_trial": 15,
+  "trials_completed": 20,
+  "best_val_loss": 0.048784948885440826,
+  "best_hyperparameters": {
+    "embedding_dim": 32,
+    "lstm_units": 32,
+    "dense_units": 16,
+    "dropout_rate": 0.5,
+    "learning_rate": 0.00013290355241150667,
+    "max_tokens": 50000,
+    "output_sequence_length": 6000,
+    "use_cudnn": "auto"
+  }
+}

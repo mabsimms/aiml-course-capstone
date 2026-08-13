@@ -1,0 +1,109 @@
+{
+  "operation": "classic train",
+  "duration_seconds": 336.20258215698414,
+  "input_data": {
+    "train_rows": 14053,
+    "test_rows": 3514,
+    "num_features": 74
+  },
+  "search_space": {
+    "clf__C": [
+      0.01,
+      0.1,
+      1,
+      10,
+      100,
+      1000
+    ],
+    "features__tfidf__max_features": [
+      5000,
+      20000,
+      null
+    ],
+    "features__tfidf__ngram_range": [
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ]
+    ]
+  },
+  "cv_folds": 5,
+  "best_params": {
+    "clf__C": 1000,
+    "features__tfidf__max_features": 20000,
+    "features__tfidf__ngram_range": [
+      1,
+      1
+    ]
+  },
+  "best_cv_f1": 0.9782467684680565,
+  "metrics": {
+    "precision": 0.9737434358589647,
+    "recall": 0.989329268292683,
+    "f1": 0.9814744801512287,
+    "roc_auc": 0.9966895394430783,
+    "threshold": 0.5,
+    "confusion_matrix": [
+      [
+        2167,
+        35
+      ],
+      [
+        14,
+        1298
+      ]
+    ],
+    "classification_report": {
+      "0": {
+        "precision": 0.9935809261806511,
+        "recall": 0.9841053587647594,
+        "f1-score": 0.9888204426192105,
+        "support": 2202.0
+      },
+      "1": {
+        "precision": 0.9737434358589647,
+        "recall": 0.989329268292683,
+        "f1-score": 0.9814744801512287,
+        "support": 1312.0
+      },
+      "accuracy": 0.9860557768924303,
+      "macro avg": {
+        "precision": 0.9836621810198078,
+        "recall": 0.9867173135287212,
+        "f1-score": 0.9851474613852196,
+        "support": 3514.0
+      },
+      "weighted avg": {
+        "precision": 0.9861743276314044,
+        "recall": 0.9860557768924303,
+        "f1-score": 0.986077726979486,
+        "support": 3514.0
+      }
+    }
+  },
+  "machine": {
+    "platform": "Linux-6.12.0-160000.35-default-x86_64-with-glibc2.40",
+    "python_version": "3.13.14",
+    "cpu_count": 32,
+    "system_memory_gb": 94.0,
+    "tensorflow_version": "2.22.0-dev0+selfbuilt",
+    "gpus": [
+      "NVIDIA GeForce RTX 5090"
+    ],
+    "gpu_memory_info": {
+      "total_mb": 32607,
+      "used_mb": 1074
+    }
+  },
+  "git": {
+    "commit": "4fed748bc0bcdeca5fd7765c7f23c47771849101",
+    "branch": "capstone-final",
+    "commit_timestamp": "2026-08-12T13:06:41-07:00",
+    "dirty": false
+  },
+  "timestamp": "2026-08-12T20:12:29.686306+00:00"
+}

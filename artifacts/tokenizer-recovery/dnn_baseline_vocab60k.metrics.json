@@ -1,0 +1,78 @@
+{
+  "operation": "dnn train",
+  "timestamp": "2026-08-11T17:24:10.145484+00:00",
+  "duration_seconds": 79.9531827190076,
+  "machine": {
+    "platform": "Linux-6.12.0-160000.35-default-x86_64-with-glibc2.40",
+    "python_version": "3.13.14",
+    "cpu_count": 32,
+    "system_memory_gb": 94.0,
+    "tensorflow_version": "2.22.0-dev0+selfbuilt",
+    "gpus": [
+      "NVIDIA GeForce RTX 5090"
+    ],
+    "gpu_memory_info": {
+      "total_mb": 32607,
+      "used_mb": 30458
+    }
+  },
+  "input_data": {
+    "train_rows": 14053,
+    "test_rows": 3514,
+    "num_features": 74
+  },
+  "hyperparameters": {
+    "use_cudnn": "auto",
+    "max_tokens": 60000,
+    "output_sequence_length": 6000
+  },
+  "training": {
+    "epochs_req": 15,
+    "epochs_run": 5,
+    "epochs_stopped": 4
+  },
+  "metrics": {
+    "precision": 0.9508692365835223,
+    "recall": 0.9588414634146342,
+    "f1": 0.9548387096774194,
+    "roc_auc": 0.9934258074699276,
+    "threshold": 0.5,
+    "confusion_matrix": [
+      [
+        2137,
+        65
+      ],
+      [
+        54,
+        1258
+      ]
+    ],
+    "classification_report": {
+      "0": {
+        "precision": 0.9753537197626655,
+        "recall": 0.9704813805631244,
+        "f1-score": 0.9729114500341453,
+        "support": 2202.0
+      },
+      "1": {
+        "precision": 0.9508692365835223,
+        "recall": 0.9588414634146342,
+        "f1-score": 0.9548387096774194,
+        "support": 1312.0
+      },
+      "accuracy": 0.9661354581673307,
+      "macro avg": {
+        "precision": 0.9631114781730938,
+        "recall": 0.9646614219888793,
+        "f1-score": 0.9638750798557822,
+        "support": 3514.0
+      },
+      "weighted avg": {
+        "precision": 0.9662121028215624,
+        "recall": 0.9661354581673307,
+        "f1-score": 0.9661637450403989,
+        "support": 3514.0
+      }
+    }
+  }
+}
